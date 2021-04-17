@@ -1,3 +1,5 @@
+import os
+from contextlib import contextmanager
 from pathlib import Path
 import types
 from tempfile import TemporaryDirectory
@@ -45,9 +47,19 @@ def build_wheel(setup_py: Path, dist_dir: Path, bdist_dir: Path) -> Path:
         raise RuntimeError("failed to build wheel package.")
 
 
+@contextmanager
+def working_directory(path: Path):
+    prev_cwd = Path.cwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(prev_cwd)
+
+
 def build_packages() -> List[Package]:
     setup_py_path = find_in_ancestors("setup.py")
-    with TemporaryDirectory() as temp_dir_str:
+    with working_directory(setup_py_path.parent), TemporaryDirectory() as temp_dir_str:
         dist_dir = Path(temp_dir_str)
         bdist_dir = dist_dir / "build"
         pkg_path = build_wheel(setup_py_path, dist_dir, bdist_dir)
