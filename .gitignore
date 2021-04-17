@@ -132,3 +132,4 @@ assets
 wandb
 checkpoints
 lightning_logs
+**/*.ipynb
