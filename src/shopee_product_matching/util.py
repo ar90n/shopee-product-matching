@@ -1,15 +1,15 @@
-import os
-import gc
-import sys
 import atexit
-import torch
-from typing import Optional, Any, Iterable, Dict
+import gc
+import os
+import sys
 from enum import Enum
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable, Dict, Iterable, Optional
+
 import numpy as np
-from albumentations import Compose
 import pytorch_lightning as pl
+import torch
+from albumentations import Compose
 from wandb import wandb_agent
 
 try:
@@ -156,6 +156,7 @@ def initialize(
         memo = os.environ.get("MEMO")
         if memo is not None:
             wandb.config.update({"memo": memo})
+
 
 def finalize() -> None:
     wandb.finish()

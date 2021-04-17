@@ -1,9 +1,10 @@
+import math
+from dataclasses import dataclass
+
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch
-import math
 from torch.nn import Parameter
-from dataclasses import dataclass
 
 
 class ArcMarginProduct(nn.Module):

@@ -1,7 +1,9 @@
+from dataclasses import asdict, dataclass
+
 import pytorch_lightning as pl
-from torch import nn
 import torch
-from dataclasses import dataclass, asdict
+from torch import nn
+
 from .datamodule import ShopeeProp
 from .scheduler import ADSRScheduler
 

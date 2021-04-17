@@ -17,22 +17,17 @@
 # %load_ext autoreload
 # %autoreload 2
 
+import pytorch_lightning as pl
 # %%
 import timm
-from shopee_product_matching.util import (
-    pass_as_image,
-    get_params_by_inspection,
-    initialize,
-    finalize,
-    get_device,
-    JobType,
-)
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+from shopee_product_matching import constants, storage
+from shopee_product_matching.logger import get_logger
 from shopee_product_matching.metric import ArcMarginProduct
 from shopee_product_matching.system import ImageMetricLearning
-from shopee_product_matching.logger import get_logger
-from shopee_product_matching import storage, constants
-import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
+from shopee_product_matching.util import (JobType, finalize, get_device,
+                                          get_params_by_inspection, initialize,
+                                          pass_as_image)
 
 # %% tags=["parameters"]
 TRAIN_BATCH_SIZE = 16
@@ -69,11 +64,9 @@ valid_transform = albumentations.Compose(
 )
 
 # %%
-from shopee_product_matching.datamodule import (
-    ShopeeDataModule,
-    ShopeeDataModuleParam,
-    ShopeeQuery,
-)
+from shopee_product_matching.datamodule import (ShopeeDataModule,
+                                                ShopeeDataModuleParam,
+                                                ShopeeQuery)
 
 shopee_dm_param = ShopeeDataModuleParam(
     train_query=ShopeeQuery(image=pass_as_image(train_transform), label_group=True),

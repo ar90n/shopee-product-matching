@@ -1,16 +1,15 @@
-from typing import Iterable, Optional, List, Tuple, Any, cast, Dict
 from pathlib import Path
-import yaml
-import jupytext
+from typing import Any, Dict, Iterable, List, Optional, Tuple, cast
+
 import git
-
-import typer
-from papermill.parameterize import parameterize_notebook, parameterize_path
-from papermill.inspection import _infer_parameters as infer_parameters
+import jupytext
 import nbformat as nbf
-
-from shopee_product_matching import kernel
+import typer
+import yaml
 from dotenv import load_dotenv
+from papermill.inspection import _infer_parameters as infer_parameters
+from papermill.parameterize import parameterize_notebook, parameterize_path
+from shopee_product_matching import kernel
 
 load_dotenv(verbose=True)
 

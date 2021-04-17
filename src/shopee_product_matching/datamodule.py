@@ -1,13 +1,14 @@
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Callable, List, Optional, Union, cast, Dict, NewType
 from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, NewType, Optional, Union, cast
 
 import cv2
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import torch
+from albumentations.pytorch.transforms import ToTensorV2
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch import Tensor
@@ -15,8 +16,6 @@ from torch.utils.data import DataLoader, Dataset
 
 from .constants import Paths
 
-
-from albumentations.pytorch.transforms import ToTensorV2
 
 def get_train_image_path(image: str) -> Path:
     return Paths.shopee_product_matching / "train_images" / image
@@ -61,9 +60,7 @@ class ShopeeDataset(Dataset[ShopeeRecord]):
 
         record = {}
         if isinstance(self.query.image, bool) and self.query.image:
-            record[ShopeeProp.image] = torch.from_numpy(
-                image.tranpose(2, 0, 1)
-            )
+            record[ShopeeProp.image] = torch.from_numpy(image.tranpose(2, 0, 1))
         if callable(self.query.image):
             augment_image = self.query.image(image)
             record[ShopeeProp.image] = torch.from_numpy(

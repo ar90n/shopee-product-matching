@@ -1,7 +1,7 @@
 import os
+import types
 from contextlib import contextmanager
 from pathlib import Path
-import types
 from tempfile import TemporaryDirectory
 from typing import List, Optional
 

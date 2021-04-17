@@ -1,5 +1,6 @@
-from typing import Iterable, Dict
-from .notebook import create_kernel, create_encoded_archive
+from typing import Dict, Iterable
+
+from .notebook import create_encoded_archive, create_kernel
 from .setuptools import build_packages, get_dependencies
 
 

@@ -1,13 +1,13 @@
-from typing import Optional
 import os
 from enum import Enum
+from typing import Optional
 
-from pytorch_lightning.loggers.wandb import WandbLogger
 from pytorch_lightning.loggers import LightningLoggerBase
-from pytorch_lightning.loggers.comet import CometLogger
 from pytorch_lightning.loggers.base import DummyLogger
+from pytorch_lightning.loggers.comet import CometLogger
+from pytorch_lightning.loggers.wandb import WandbLogger
 
-from .util import get_project, get_notebook_name
+from .util import get_notebook_name, get_project
 
 
 def get_logger(

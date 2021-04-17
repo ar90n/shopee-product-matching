@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from typing import Any, Optional
+
 import wandb
 
 from .util import get_project

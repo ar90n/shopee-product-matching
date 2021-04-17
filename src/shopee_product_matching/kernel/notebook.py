@@ -1,11 +1,12 @@
-import json
-import jupytext
-import nbformat as nbf
 import base64
 import gzip
 import io
+import json
 import tarfile
 from typing import Dict, Iterable, Optional
+
+import jupytext
+import nbformat as nbf
 
 from .package import Package
 
