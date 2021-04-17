@@ -1,4 +1,3 @@
-__version__ = '0.1.0'
+from . import datamodule, util, kernel
 
-
-a = f"100"
+__version__ = "0.1.0"

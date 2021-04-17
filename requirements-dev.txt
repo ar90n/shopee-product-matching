@@ -1,3 +1,7 @@
 omegaconf
 typer
 papermill
+pandas-stubs
+jupytext
+python-dotenv
+GitPython
