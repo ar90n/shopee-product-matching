@@ -5,23 +5,23 @@ from shopee_product_matching.util import get_input
 
 class _TrainData:
     @property
-    def posting_id_unique_count() -> int:
+    def posting_id_unique_count(self) -> int:
         return 34250
 
     @property
-    def image_count() -> int:
+    def image_count(self) -> int:
         return 32412
 
     @property
-    def image_phash_unique_count() -> int:
+    def image_phash_unique_count(self) -> int:
         return 28735
 
     @property
-    def title_unique_unique_count() -> int:
+    def title_unique_unique_count(self) -> int:
         return 33117
 
     @property
-    def label_group_unique_unique_count() -> int:
+    def label_group_unique_unique_count(self) -> int:
         return 11014
 
 
