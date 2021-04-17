@@ -45,9 +45,13 @@ BOOTSTRAP_TEMPLATE: str = """def __bootstrap__():
         output = subprocess.run(["pip", "install", "--no-deps", *pkg_path_list], capture_output=True, encoding="utf-8", check=True).stdout
         print(output)
     if {enable_internet} and 0 < len({dependencies}):
-        args = ["pip", "install", *{dependencies}]
-        output = subprocess.run(args, capture_output=True, encoding="utf-8", check=True).stdout
-        print(output)
+        for pkg in {dependencies}:
+            args = ["pip", "install", pkg]
+            try:
+                output = subprocess.run(args, capture_output=True, encoding="utf-8", check=True).stdout
+                print(output)
+            except:
+                pass
     # this is base64 encoded source code
     tar_io = io.BytesIO(gzip.decompress(base64.b64decode("{pkg_encoded}")))
     with TemporaryDirectory() as temp_dir:

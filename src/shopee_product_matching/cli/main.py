@@ -9,7 +9,9 @@ import yaml
 from dotenv import load_dotenv
 from papermill.inspection import _infer_parameters as infer_parameters
 from papermill.parameterize import parameterize_notebook, parameterize_path
-from shopee_product_matching import kernel
+
+from . import kaggle
+from .build import build as kernel_build
 
 load_dotenv(verbose=True)
 
@@ -100,13 +102,13 @@ def build(
 
     secret_keys = list({*secret_key, "WANDB_API_KEY"})
 
-    env_variables["EXPERIMENT_NAME"] = str(input.parent.stem)
+    env_variables["EXPERIMENT_NAME"] = str(input.absolute().parent.stem)
     env_variables["GIT_COMMIT_HASH"] = git_commit_hash
     env_variables["PARAM_NAMES"] = ",".join(get_param_names(code))
     if memo is not None:
         env_variables["MEMO"] = memo
 
-    nb = kernel.build(
+    nb = kernel_build(
         code,
         pkg_dataset=pkg_dataset,
         prologue=prologue,
@@ -131,6 +133,37 @@ def inspect(
 
     params = infer_parameters(nb)
     print(dump_params_as_yaml(params))
+
+
+@app.command()
+def push(
+    code_file: Path,
+    slug: str = "shopee-product-matching",
+    id_no: int = 16292473,
+    title: str = "shopee product matching",
+    is_public: bool = False,
+    disable_gpu: bool = False,
+    disable_internet: bool = False,
+    dataset_source: Optional[List[str]] = typer.Option(None),
+    kernel_source: Optional[List[str]] = typer.Option(None),
+) -> None:
+    dataset_sources = [] if dataset_source is None else dataset_source
+    kernel_sources = [] if kernel_source is None else kernel_source
+    competition_sources = ["shopee-product-matching"]
+
+    response = kaggle.push(
+        id_no=id_no,
+        slug=slug,
+        title=title,
+        body=code_file.read_text(),
+        is_public=is_public,
+        disable_gpu=disable_gpu,
+        disable_internet=disable_internet,
+        dataset_sources=dataset_sources,
+        kernel_sources=kernel_sources,
+        competition_sources=competition_sources,
+    )
+    kaggle.print_response(response)
 
 
 def main() -> None:
