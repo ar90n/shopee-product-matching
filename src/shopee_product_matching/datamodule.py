@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from types import resolve_bases
 from typing import Any, Callable, Dict, List, NewType, Optional, Union, cast
 
 import cv2
@@ -17,11 +18,8 @@ from torch.utils.data import DataLoader, Dataset
 from .constants import Paths
 
 
-def get_train_image_path(image: str) -> Path:
-    return Paths.shopee_product_matching / "train_images" / image
-
-
 class ShopeeProp(Enum):
+    posting_id = "posting_id"
     image = "image"
     title = "title"
     image_phash = "image_phash"
@@ -36,29 +34,42 @@ ShopeeRecord = NewType("ShopeeRecord", Dict[ShopeeProp, Union[Tensor, str]])
 
 @dataclass
 class ShopeeQuery:
+    posting_id: bool = True
     image: Union[bool, Callable[[np.ndarray], np.ndarray]] = False
     title: bool = False
     image_phash: bool = False
     label_group: bool = False
 
 
+class DatasetType(Enum):
+    train: str = "train"
+    test: str = "test"
+
+    def __str__(self) -> str:
+        return self.value
+
+
 class ShopeeDataset(Dataset[ShopeeRecord]):
     df: pd.DataFrame
     query: ShopeeQuery
+    dataset_type: DatasetType
 
     def __init__(self, df: pd.DataFrame, query: ShopeeQuery):
         self.df = cast(pd.DataFrame, df.reset_index())
         self.query = query
+        self.dataset_type = self._detect_dataset_type(df)
 
     def __len__(self) -> int:
         return self.df.shape[0]
 
     def __getitem__(self, index: int) -> ShopeeRecord:
         row = self.df.iloc[index]
-        image = cv2.imread(str(get_train_image_path(row.image)))
+        image = cv2.imread(str(self._get_image_path(row.image)))
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         record = {}
+        if self.query.posting_id:
+            record[ShopeeProp.posting_id] = row.posting_id
         if isinstance(self.query.image, bool) and self.query.image:
             record[ShopeeProp.image] = torch.from_numpy(image.tranpose(2, 0, 1))
         if callable(self.query.image):
@@ -74,6 +85,17 @@ class ShopeeDataset(Dataset[ShopeeRecord]):
             record[ShopeeProp.label_group] = torch.tensor(row.label_group)
         return record
 
+    def _detect_dataset_type(self, df: pd.DataFrame) -> DatasetType:
+        if df.iloc[0].posting_id.startswith("train"):
+            return DatasetType.train
+        else:
+            return DatasetType.test
+
+    def _get_image_path(self, image: str) -> Path:
+        if self.dataset_type == DatasetType.train:
+            return Paths.shopee_product_matching / "train_images" / image
+        else:
+            return Paths.shopee_product_matching / "test_images" / image
 
 @dataclass
 class ShopeeDataModuleParam:

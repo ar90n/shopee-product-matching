@@ -174,14 +174,13 @@ def get_params_by_inspection() -> Dict[str, Any]:
     import inspect
 
     params = {}
-    param_names = os.environ.get("PARAM_NAMES", "").split(",")
+    param_names = os.environ["PARAM_NAMES"].split(",") if "PARAM_NAMES" in os.environ else []
 
     frame = inspect.currentframe()
     try:
         parent_local_variables = frame.f_back.f_locals
         for name in param_names:
             params[name] = parent_local_variables[name]
-
     finally:
         del frame
     return params
