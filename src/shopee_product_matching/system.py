@@ -113,8 +113,15 @@ class ImageMetricLearning(pl.LightningModule):
     def test_epoch_end(self, outputs: Dict[str, List[Any]]) -> None:
         flatten_outputs = self._accumulate_outputs(outputs)
         result = get_image_predictions(
-            flatten_outputs["posing_ids"], flatten_outputs["embeddings"]
+            flatten_outputs["posting_ids"], flatten_outputs["embeddings"]
         )
+        df = pd.DataFrame(
+            {
+                "posting_id": flatten_outputs["posting_ids"],
+                "matches": [" ".join(rs) for rs in result]
+            }
+        )
+        df.to_csv('submission.csv', index = False)
         print(result)
 
     def _accumulate_outputs(
