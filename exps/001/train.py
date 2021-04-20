@@ -39,7 +39,8 @@ TRAIN_BATCH_SIZE = 16
 VALID_BATCH_SIZE = 16
 NUM_WORKERS = 4
 MAX_EPOCHS = 5
-OVERFIT_BATCHES = 1.0
+OVERFIT_BATCHES = 0
+FAST_DEV_RUN = False
 SEED = 42
 BACKBONE = "efficientnet_b3"
 EARLY_STOP_PATIENCE = 5
@@ -115,9 +116,10 @@ trainer = pl.Trainer(
     callbacks=[early_stop_callback, checkpoint_callback],
     max_epochs=MAX_EPOCHS,
     overfit_batches=OVERFIT_BATCHES,
+    fast_dev_run=FAST_DEV_RUN,
     logger=get_logger(),
 )
-trainer.fit(shopee_net, shopee_dm)
+trainer.fit(shopee_net, datamodule=shopee_dm)
 
 # %%
 storage.save(checkpoint_callback.best_model_path)
