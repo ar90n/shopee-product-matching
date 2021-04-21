@@ -10,7 +10,7 @@ def build(
     prologue: str,
     env_variables: Dict[str, str],
     secret_keys: Iterable[str],
-    enable_internet: bool,
+    use_internet: bool,
 ) -> str:
     encoded_archive = create_encoded_archive(build_packages())
     dependencies = get_dependencies()
@@ -22,5 +22,5 @@ def build(
         dependencies=dependencies,
         secret_keys=secret_keys,
         prologue=prologue,
-        enable_internet=enable_internet,
+        use_internet=use_internet,
     )

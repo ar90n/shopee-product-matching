@@ -42,9 +42,14 @@ BOOTSTRAP_TEMPLATE: str = """def __bootstrap__():
         pip_pkgs_path = Path.cwd().parent / "input" / "{pkg_dataset}" / "pip"
         _find_pkgs(pip_pkgs_path)
     if 0 < len(pkg_path_list):
-        output = subprocess.run(["pip", "install", "--no-deps", *pkg_path_list], capture_output=True, encoding="utf-8", check=True).stdout
-        print(output)
-    if {enable_internet} and 0 < len({dependencies}):
+        for pkg in pkg_path_list:
+            args = ["pip", "install", "--no-deps", pkg]
+            try:
+                output = subprocess.run(args, capture_output=True, encoding="utf-8", check=True).stdout
+                print(output)
+            except:
+                pass
+    if {use_internet} and 0 < len({dependencies}):
         for pkg in {dependencies}:
             args = ["pip", "install", pkg]
             try:
@@ -64,7 +69,7 @@ BOOTSTRAP_TEMPLATE: str = """def __bootstrap__():
                 print(output)
     sys.path.append("/kaggle/working")
     # Add secrets to environment variables
-    if {enable_internet} and has_kaggle_packages:
+    if {use_internet} and has_kaggle_packages:
         user_secrets = UserSecretsClient()
         for k in {secret_keys}:
             try:
@@ -73,6 +78,7 @@ BOOTSTRAP_TEMPLATE: str = """def __bootstrap__():
                 pass
     # Update environment variables
     os.environ.update({env_variables})
+    os.environ.update({{USE_INTERNET: str({use_internet})}})
 __bootstrap__()"""
 
 
@@ -82,7 +88,7 @@ def create_bootstrap_code(
     env_variables: Dict,
     dependencies: Iterable[str],
     secret_keys: Iterable[str],
-    enable_internet: bool = False,
+    use_internet: bool = False,
 ) -> str:
     return BOOTSTRAP_TEMPLATE.format(
         pkg_encoded=pkg_encoded,
@@ -90,7 +96,7 @@ def create_bootstrap_code(
         env_variables=json.dumps(env_variables),
         dependencies=json.dumps(dependencies),
         secret_keys=json.dumps(secret_keys),
-        enable_internet=enable_internet,
+        use_internet=use_internet,
         encoding="utf8",
     )
 
@@ -118,7 +124,7 @@ def create_bootstrap_cell(
     env_variables: Dict[str, str],
     dependencies: Iterable[str],
     secret_keys: Iterable[str],
-    enable_internet: bool = False,
+    use_internet: bool = False,
 ) -> nbf.NotebookNode:
     code = create_bootstrap_code(
         pkg_encoded=pkg_encoded,
@@ -126,7 +132,7 @@ def create_bootstrap_cell(
         env_variables=env_variables,
         dependencies=dependencies,
         secret_keys=secret_keys,
-        enable_internet=enable_internet,
+        use_internet=use_internet,
     )
     metadata = {"trusted": True, "_kg_hide-input": True, "_kg_hide-output": True}
     return nbf.v4.new_code_cell(code, metadata=metadata)
@@ -140,7 +146,7 @@ def create_kernel(
     dependencies: Iterable[str],
     secret_keys: Iterable[str],
     prologue: str,
-    enable_internet: bool = False,
+    use_internet: bool = False,
 ) -> nbf.NotebookNode:
     notebook = jupytext.reads(code, fmt="py")
     bootstrap_cell = create_bootstrap_cell(
@@ -149,7 +155,7 @@ def create_kernel(
         env_variables=env_variables,
         dependencies=dependencies,
         secret_keys=secret_keys,
-        enable_internet=enable_internet,
+        use_internet=use_internet,
     )
     notebook.cells.insert(0, bootstrap_cell)
 

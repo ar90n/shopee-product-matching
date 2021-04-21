@@ -15,6 +15,7 @@
 
 
 # %%
+import pytorch_lightning as pl
 import timm
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from shopee_product_matching import constants, storage
@@ -26,8 +27,10 @@ from shopee_product_matching.util import (
     finalize,
     get_device,
     get_params_by_inspection,
+    get_requirements,
     initialize,
     pass_as_image,
+    is_kaggle
 )
 
 # %%
@@ -44,10 +47,14 @@ SEED = 42
 BACKBONE = "efficientnet_b3"
 EARLY_STOP_PATIENCE = 5
 DIM = [512, 512]
+CHECKPOINT_FILE_NAME: str = ""
 
 # %%
 initialize(SEED, JobType.Inferene, params=get_params_by_inspection())
+if is_kaggle():
+    import kaggle_timm_pretrained
 
+    kaggle_timm_pretrained.patch()
 # %%
 import albumentations
 
@@ -94,15 +101,13 @@ metric = ArcMarginProduct(
 )
 param = ImageMetricLearning.Param(max_lr=1e-5 * TRAIN_BATCH_SIZE)
 shopee_net = ImageMetricLearning.load_from_checkpoint(
-    "./checkpoints/exp-001-epoch=02-valid_loss=21.42-v3.ckpt",
+    str(get_requirements() / CHECKPOINT_FILE_NAME),
     param=param,
     backbone=backbone,
     metric=metric,
 )
 
 # %%
-import pytorch_lightning as pl
-
 trainer = pl.Trainer(
     precision=16,
     gpus=1,
@@ -111,7 +116,4 @@ trainer = pl.Trainer(
 trainer.test(shopee_net, datamodule=shopee_dm)
 
 # %%
-#trainer.test(shopee_net, shopee_dm)
-
-# %%
-#finalize()
+finalize()

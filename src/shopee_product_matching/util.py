@@ -84,6 +84,9 @@ def get_input() -> Path:
 
     raise EnvironmentError("input is not found")
 
+def get_requirements() -> Path:
+    return get_input() / "shopeeproductmatchingrequirements"
+
 
 def get_device(n: Optional[int] = None) -> Any:
     if is_tpu_available():
@@ -136,7 +139,7 @@ def initialize(
 ) -> None:
     pl.seed_everything(seed)
 
-    if has_wandb:
+    if has_wandb and job_type == JobType.Training:
         group = os.environ.get("EXPERIMENT_NAME")
 
         wandb.init(

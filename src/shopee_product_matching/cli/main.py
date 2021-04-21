@@ -71,12 +71,12 @@ def build(
     input: Path,
     output: Optional[Path] = typer.Option(None),
     param_file: Optional[Path] = typer.Option(None),
-    pkg_dataset: str = typer.Option("", envvar="SHOPEE_PRODUCT_MATCHING_PKG_DATASET"),
+    pkg_dataset: str = typer.Option("shopeeproductmatchingrequirements"),
     prologue: str = typer.Option("", envvar="SHOPEE_PRODUCT_MATCHING_PROLOGUE"),
     env: Optional[List[str]] = typer.Option(None),
     param: Optional[List[str]] = typer.Option(None),
     secret_key: Optional[List[str]] = typer.Option(None),
-    enable_internet: bool = True,
+    use_internet: bool = True,
     strict: bool = False,
     memo: Optional[str] = None,
 ) -> None:
@@ -114,7 +114,7 @@ def build(
         prologue=prologue,
         env_variables=env_variables,
         secret_keys=secret_keys,
-        enable_internet=enable_internet,
+        use_internet=use_internet,
     )
     initialize_metadata(nb)
 
@@ -147,9 +147,11 @@ def push(
     dataset_source: Optional[List[str]] = typer.Option(None),
     kernel_source: Optional[List[str]] = typer.Option(None),
 ) -> None:
-    dataset_sources = [] if dataset_source is None else dataset_source
-    kernel_sources = [] if kernel_source is None else kernel_source
+    dataset_sources = [] if dataset_source is None else list(dataset_source)
+    kernel_sources = [] if kernel_source is None else list(kernel_source)
     competition_sources = ["shopee-product-matching"]
+    dataset_sources.append("ar90ngas/shopeeproductmatchingrequirements")
+    dataset_sources.append("ar90ngas/timm-pretrained-efficientnet")
 
     response = kaggle.push(
         id_no=id_no,
