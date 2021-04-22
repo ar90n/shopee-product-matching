@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass
-from typing import List, Any, Dict
+from typing import List, Any, Dict, Optional
 
 import pytorch_lightning as pl
 from pytorch_lightning.core.lightning import LightningModule
@@ -30,6 +30,7 @@ class ImageMetricLearning(pl.LightningModule):
         head=nn.Identity(),
         metric=nn.Identity(),
         loss=nn.CrossEntropyLoss(),
+        submission_filename=None,
     ) -> None:
         super().__init__()
         self.scheduler_params = {}
@@ -40,6 +41,7 @@ class ImageMetricLearning(pl.LightningModule):
         self.head = head
         self.metric = metric
         self.loss = loss
+        self.submission_filename = submission_filename
 
     def forward(self, x):
         batch_size = x.shape[0]
@@ -117,7 +119,9 @@ class ImageMetricLearning(pl.LightningModule):
             acc_outputs["posting_ids"], acc_outputs["embeddings"]
         )
 
-        _save_submission_csv(acc_outputs["posting_ids"], matches)
+        _save_submission_csv(
+            acc_outputs["posting_ids"], matches, self.submission_filename
+        )
 
 
 def _accumulate_outputs(outputs: List[Dict[str, List[Any]]]) -> Dict[str, Any]:
@@ -171,13 +175,17 @@ def f1_score(infer_matches: List[List[str]], expect_matches: List[List[str]]) ->
     return sum(intersection) / len(intersection)
 
 
-def _save_submission_csv(posting_ids: List[str], matches: List[List[str]]):
+def _save_submission_csv(
+    posting_ids: List[str], matches: List[List[str]], filename: Optional[str]
+) -> None:
     df = pd.DataFrame(
         {
             "posting_id": posting_ids,
             "matches": [" ".join(rs) for rs in matches],
         }
     )
+
+    filename = "submission.csv" if filename is None else filename
     df.to_csv("submission.csv", index=False)
 
 
