@@ -1,5 +1,8 @@
 from pathlib import Path
+import os
+import tempfile
 from typing import Any, Dict, Iterable, List, Optional, Tuple, cast
+from tempfile import TemporaryDirectory
 
 import git
 import jupytext
@@ -61,9 +64,12 @@ def get_param_names(code) -> List[str]:
 
 
 def get_git_commit_hash() -> str:
-    return git.repo.Repo(search_parent_directories=True).git.describe(
-        always=True, dirty=True
-    )
+    try:
+        return git.repo.Repo(search_parent_directories=True).git.describe(
+            always=True, dirty=True
+        )
+    except git.exc.InvalidGitRepositoryError:
+        return ""
 
 
 @app.command()
@@ -71,7 +77,6 @@ def build(
     input: Path,
     output: Optional[Path] = typer.Option(None),
     param_file: Optional[Path] = typer.Option(None),
-    pkg_dataset: str = typer.Option("shopeeproductmatchingrequirements"),
     prologue: str = typer.Option("", envvar="SHOPEE_PRODUCT_MATCHING_PROLOGUE"),
     env: Optional[List[str]] = typer.Option(None),
     param: Optional[List[str]] = typer.Option(None),
@@ -105,6 +110,7 @@ def build(
     env_variables["EXPERIMENT_NAME"] = str(input.absolute().parent.stem)
     env_variables["GIT_COMMIT_HASH"] = git_commit_hash
     env_variables["PARAM_NAMES"] = ",".join(get_param_names(code))
+    pkg_dataset = ("shopeeproductmatchingrequirements",)
     if memo is not None:
         env_variables["MEMO"] = memo
 
@@ -166,6 +172,40 @@ def push(
         competition_sources=competition_sources,
     )
     kaggle.print_response(response)
+
+
+@app.command()
+def submit(
+    ctx: typer.Context,
+    input: Path,
+    param_file: Optional[Path] = typer.Option(None),
+    env: Optional[List[str]] = typer.Option(None),
+    strict: bool = False,
+) -> None:
+    input = input.absolute()
+    with TemporaryDirectory() as temp:
+        output = Path(temp) / input.with_suffix(".ipynb").name
+        ctx.invoke(
+            build,
+            input=input,
+            output=output,
+            param_file=param_file,
+            prologue="",
+            param={},
+            secret_key=[],
+            env=env,
+            strict=strict,
+            use_internet=False,
+        )
+
+        notebook_path = list(Path(temp).glob("*.ipynb"))[0]
+        ctx.invoke(
+            push,
+            code_file=notebook_path,
+            disable_internet=True,
+            dataset_source=[],
+            kernel_source=[],
+        )
 
 
 def main() -> None:
