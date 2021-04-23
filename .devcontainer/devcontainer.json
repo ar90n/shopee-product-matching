@@ -33,7 +33,8 @@
 		"ms-python.python",
 		"ms-python.vscode-pylance",
 		"bonprosoft.pysen-vscode",
-		"mutantdino.resourcemonitor"
+		"mutantdino.resourcemonitor",
+		"streetsidesoftware.code-spell-checker"
 	],
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
