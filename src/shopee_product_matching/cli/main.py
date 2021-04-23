@@ -1,8 +1,8 @@
-from pathlib import Path
 import os
 import tempfile
-from typing import Any, Dict, Iterable, List, Optional, Tuple, cast
+from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any, Dict, Iterable, List, Optional, Tuple, cast
 
 import git
 import jupytext

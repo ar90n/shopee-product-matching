@@ -18,20 +18,15 @@
 import pytorch_lightning as pl
 import timm
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
-from shopee_product_matching import constants, storage
-from shopee_product_matching import util
+
+from shopee_product_matching import constants, storage, util
 from shopee_product_matching.logger import get_logger
 from shopee_product_matching.metric import ArcMarginProduct
 from shopee_product_matching.system import ImageMetricLearning
-from shopee_product_matching.util import (
-    JobType,
-    finalize,
-    get_params_by_inspection,
-    get_requirements,
-    initialize,
-    pass_as_image,
-    is_kaggle
-)
+from shopee_product_matching.util import (JobType, finalize,
+                                          get_params_by_inspection,
+                                          get_requirements, initialize,
+                                          is_kaggle, pass_as_image)
 
 # %%
 # %load_ext autoreload
@@ -76,15 +71,17 @@ valid_transform = albumentations.Compose(
 )
 
 # %%
-from shopee_product_matching.datamodule import (
-    ShopeeDataModule,
-    ShopeeDataModuleParam,
-    ShopeeQuery,
-)
+from shopee_product_matching.datamodule import (ShopeeDataModule,
+                                                ShopeeDataModuleParam,
+                                                ShopeeQuery)
 
 shopee_dm_param = ShopeeDataModuleParam(
-    train_query=ShopeeQuery(image=pass_as_image(train_transform), title=True, label_group=True),
-    valid_query=ShopeeQuery(image=pass_as_image(valid_transform), title=True, label_group=True),
+    train_query=ShopeeQuery(
+        image=pass_as_image(train_transform), title=True, label_group=True
+    ),
+    valid_query=ShopeeQuery(
+        image=pass_as_image(valid_transform), title=True, label_group=True
+    ),
     test_query=ShopeeQuery(image=pass_as_image(valid_transform), title=True),
 )
 shopee_dm = ShopeeDataModule(shopee_dm_param)
@@ -93,6 +90,7 @@ shopee_dm.setup()
 # %%
 from shopee_product_matching.feature import TfIdfEmbedding, find_matches
 from shopee_product_matching.util import save_submission_csv
+
 em = TfIdfEmbedding().fit_transform(shopee_dm.test_dataset.df["title"].tolist())
 posting_ids = shopee_dm.test_dataset.df["posting_id"].tolist()
 text_matches = find_matches(posting_ids, em, 0.6)
@@ -132,9 +130,16 @@ trainer.test(shopee_net, datamodule=shopee_dm)
 util.clean_up()
 # %%
 import pandas as pd
-submission_text = pd.read_csv("submission_text.csv", index_col=0).applymap(lambda x: x.split(" "))
-submission_image = pd.read_csv("submission_image.csv", index_col=0).applymap(lambda x: x.split(" "))
-submission_ensembled = (submission_image + submission_text).applymap(set).applymap(lambda x: " ".join(x))
+
+submission_text = pd.read_csv("submission_text.csv", index_col=0).applymap(
+    lambda x: x.split(" ")
+)
+submission_image = pd.read_csv("submission_image.csv", index_col=0).applymap(
+    lambda x: x.split(" ")
+)
+submission_ensembled = (
+    (submission_image + submission_text).applymap(set).applymap(lambda x: " ".join(x))
+)
 submission_ensembled.to_csv("submission.csv")
 
 # %%

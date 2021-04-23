@@ -1,10 +1,10 @@
 from typing import Iterable, List
 
-import numpy as np
-from cuml.feature_extraction.text import TfidfVectorizer
-from cuml import PCA
-from cuml.neighbors import NearestNeighbors
 import cudf
+import numpy as np
+from cuml import PCA
+from cuml.feature_extraction.text import TfidfVectorizer
+from cuml.neighbors import NearestNeighbors
 
 
 class TfIdfEmbedding:

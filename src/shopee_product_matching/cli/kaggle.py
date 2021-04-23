@@ -1,16 +1,14 @@
-from typing import Any, Iterable
 from functools import singledispatch
+from typing import Any, Iterable
 
 import typer
 from kaggle import KaggleApi
 from kaggle.api_client import ApiClient
 from kaggle.models.dataset_new_request import DatasetNewRequest
 from kaggle.models.dataset_new_version_request import DatasetNewVersionRequest
-from kaggle.models.kaggle_models_extended import (
-    DatasetNewResponse,
-    DatasetNewVersionResponse,
-    KernelPushResponse,
-)
+from kaggle.models.kaggle_models_extended import (DatasetNewResponse,
+                                                  DatasetNewVersionResponse,
+                                                  KernelPushResponse)
 from kaggle.models.kernel_push_request import KernelPushRequest
 
 

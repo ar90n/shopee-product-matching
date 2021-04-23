@@ -1,16 +1,16 @@
 from dataclasses import asdict, dataclass
-from typing import List, Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-import pytorch_lightning as pl
-from pytorch_lightning.core.lightning import LightningModule
-import torch
-from torch import nn
 import numpy as np
 import pandas as pd
+import pytorch_lightning as pl
+import torch
+from pytorch_lightning.core.lightning import LightningModule
+from torch import nn
 
 from .datamodule import ShopeeProp
-from .scheduler import ADSRScheduler
 from .feature import find_matches
+from .scheduler import ADSRScheduler
 from .util import save_submission_csv
 
 
@@ -112,9 +112,7 @@ class ImageMetricLearning(pl.LightningModule):
 
     def test_epoch_end(self, outputs: Dict[str, List[Any]]) -> None:
         acc_outputs = _accumulate_outputs(outputs)
-        matches = find_matches(
-            acc_outputs["posting_ids"], acc_outputs["embeddings"]
-        )
+        matches = find_matches(acc_outputs["posting_ids"], acc_outputs["embeddings"])
 
         save_submission_csv(
             acc_outputs["posting_ids"], matches, self.submission_filename

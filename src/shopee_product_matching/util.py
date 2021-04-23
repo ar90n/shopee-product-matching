@@ -1,17 +1,15 @@
-import atexit
 import gc
 import os
 import sys
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Optional, List
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytorch_lightning as pl
 import torch
 from albumentations import Compose
-from wandb import wandb_agent
 
 try:
     import torch_xla
@@ -205,6 +203,7 @@ def save_submission_csv(
 
     filename = "submission.csv" if filename is None else filename
     df.to_csv(filename, index=False)
+
 
 def clean_up() -> None:
     if torch.cuda.is_available():

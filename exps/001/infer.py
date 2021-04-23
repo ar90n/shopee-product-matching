@@ -18,20 +18,15 @@
 import pytorch_lightning as pl
 import timm
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+
 from shopee_product_matching import constants, storage
 from shopee_product_matching.logger import get_logger
 from shopee_product_matching.metric import ArcMarginProduct
 from shopee_product_matching.system import ImageMetricLearning
-from shopee_product_matching.util import (
-    JobType,
-    finalize,
-    get_device,
-    get_params_by_inspection,
-    get_requirements,
-    initialize,
-    pass_as_image,
-    is_kaggle
-)
+from shopee_product_matching.util import (JobType, finalize, get_device,
+                                          get_params_by_inspection,
+                                          get_requirements, initialize,
+                                          is_kaggle, pass_as_image)
 
 # %%
 # %load_ext autoreload
@@ -76,11 +71,9 @@ valid_transform = albumentations.Compose(
 )
 
 # %%
-from shopee_product_matching.datamodule import (
-    ShopeeDataModule,
-    ShopeeDataModuleParam,
-    ShopeeQuery,
-)
+from shopee_product_matching.datamodule import (ShopeeDataModule,
+                                                ShopeeDataModuleParam,
+                                                ShopeeQuery)
 
 shopee_dm_param = ShopeeDataModuleParam(
     train_query=ShopeeQuery(image=pass_as_image(train_transform), label_group=True),

@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from types import resolve_bases
 from typing import Any, Callable, Dict, List, NewType, Optional, Union, cast
 
 import cv2
@@ -9,7 +8,6 @@ import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import torch
-from albumentations.pytorch.transforms import ToTensorV2
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch import Tensor
@@ -55,7 +53,7 @@ class ShopeeDataset(Dataset[ShopeeRecord]):
     dataset_type: DatasetType
 
     def __init__(self, df: pd.DataFrame, query: ShopeeQuery):
-        self.df = cast(pd.DataFrame, df.reset_index())
+        self.df = df.reset_index()
         self.query = query
         self.dataset_type = self._detect_dataset_type(df)
 
@@ -83,7 +81,7 @@ class ShopeeDataset(Dataset[ShopeeRecord]):
             record[ShopeeProp.image_phash] = row.image_phash
         if self.query.label_group:
             record[ShopeeProp.label_group] = torch.tensor(row.label_group)
-        return record
+        return cast(ShopeeRecord, record)
 
     def _detect_dataset_type(self, df: pd.DataFrame) -> DatasetType:
         if df.iloc[0].posting_id.startswith("train"):
@@ -96,6 +94,7 @@ class ShopeeDataset(Dataset[ShopeeRecord]):
             return Paths.shopee_product_matching / "train_images" / image
         else:
             return Paths.shopee_product_matching / "test_images" / image
+
 
 @dataclass
 class ShopeeDataModuleParam:
@@ -115,7 +114,6 @@ class ShopeeDataModule(pl.LightningDataModule):
         self,
         param: ShopeeDataModuleParam,
     ):
-        super().__init__()
         self.param = param
 
     def setup(self, stage: Optional[str] = None) -> None:
