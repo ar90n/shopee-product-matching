@@ -8,13 +8,10 @@ from torch import nn
 import numpy as np
 import pandas as pd
 
-# from cuml.feature_extraction.text import TfidfVectorizer
-# from cuml.neighbors import NearestNeighbors
-from sklearn.neighbors import NearestNeighbors
-from torch._C import Value
-
 from .datamodule import ShopeeProp
 from .scheduler import ADSRScheduler
+from .feature import find_matches
+from .util import save_submission_csv
 
 
 class ImageMetricLearning(pl.LightningModule):
@@ -86,7 +83,7 @@ class ImageMetricLearning(pl.LightningModule):
     def validation_epoch_end(self, outputs: List[Dict[str, List[Any]]]) -> None:
         try:
             acc_outputs = _accumulate_outputs(outputs)
-            infer_matches = _get_image_predictions(
+            infer_matches = find_matches(
                 acc_outputs["posting_ids"], acc_outputs["embeddings"]
             )
 
@@ -115,11 +112,11 @@ class ImageMetricLearning(pl.LightningModule):
 
     def test_epoch_end(self, outputs: Dict[str, List[Any]]) -> None:
         acc_outputs = _accumulate_outputs(outputs)
-        matches = _get_image_predictions(
+        matches = find_matches(
             acc_outputs["posting_ids"], acc_outputs["embeddings"]
         )
 
-        _save_submission_csv(
+        save_submission_csv(
             acc_outputs["posting_ids"], matches, self.submission_filename
         )
 
@@ -144,49 +141,12 @@ def _accumulate_outputs(outputs: List[Dict[str, List[Any]]]) -> Dict[str, Any]:
     }
 
 
-def _get_image_predictions(
-    posting_ids: List[str], embeddings: np.ndarray, threshold: float = 3.4
-) -> List[List[str]]:
-    KNN = min(3, len(posting_ids))
-
-    model = NearestNeighbors(n_neighbors=KNN)
-    model.fit(embeddings)
-    distances, indices = model.kneighbors(embeddings)
-
-    predictions: List[List[str]] = []
-    for k in range(embeddings.shape[0]):
-        idx = np.where(
-            distances[
-                k,
-            ]
-            < threshold
-        )[0]
-        ids = indices[k, idx]
-        predictions.append([posting_ids[i] for i in ids])
-
-    return predictions
-
-
 def f1_score(infer_matches: List[List[str]], expect_matches: List[List[str]]) -> float:
     intersection = [
         (2 * len(set(a) & set(b))) / (len(a) + len(b))
         for a, b in zip(infer_matches, expect_matches)
     ]
     return sum(intersection) / len(intersection)
-
-
-def _save_submission_csv(
-    posting_ids: List[str], matches: List[List[str]], filename: Optional[str]
-) -> None:
-    df = pd.DataFrame(
-        {
-            "posting_id": posting_ids,
-            "matches": [" ".join(rs) for rs in matches],
-        }
-    )
-
-    filename = "submission.csv" if filename is None else filename
-    df.to_csv("submission.csv", index=False)
 
 
 def _get_expect_matches(

@@ -78,7 +78,7 @@ BOOTSTRAP_TEMPLATE: str = """def __bootstrap__():
                 pass
     # Update environment variables
     os.environ.update({env_variables})
-    os.environ.update({{USE_INTERNET: str({use_internet})}})
+    os.environ.update({{"USE_INTERNET": str({use_internet})}})
 __bootstrap__()"""
 
 

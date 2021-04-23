@@ -4,8 +4,9 @@ import os
 import sys
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Optional
+from typing import Any, Callable, Dict, Iterable, Optional, List
 
+import pandas as pd
 import numpy as np
 import pytorch_lightning as pl
 import torch
@@ -83,6 +84,7 @@ def get_input() -> Path:
         cur_path = cur_path.parent
 
     raise EnvironmentError("input is not found")
+
 
 def get_requirements() -> Path:
     return get_input() / "shopeeproductmatchingrequirements"
@@ -177,7 +179,9 @@ def get_params_by_inspection() -> Dict[str, Any]:
     import inspect
 
     params = {}
-    param_names = os.environ["PARAM_NAMES"].split(",") if "PARAM_NAMES" in os.environ else []
+    param_names = (
+        os.environ["PARAM_NAMES"].split(",") if "PARAM_NAMES" in os.environ else []
+    )
 
     frame = inspect.currentframe()
     try:
@@ -187,3 +191,22 @@ def get_params_by_inspection() -> Dict[str, Any]:
     finally:
         del frame
     return params
+
+
+def save_submission_csv(
+    posting_ids: List[str], matches: List[List[str]], filename: Optional[str]
+) -> None:
+    df = pd.DataFrame(
+        {
+            "posting_id": posting_ids,
+            "matches": [" ".join(rs) for rs in matches],
+        }
+    )
+
+    filename = "submission.csv" if filename is None else filename
+    df.to_csv(filename, index=False)
+
+def clean_up() -> None:
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    gc.collect()

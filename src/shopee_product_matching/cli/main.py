@@ -110,7 +110,7 @@ def build(
     env_variables["EXPERIMENT_NAME"] = str(input.absolute().parent.stem)
     env_variables["GIT_COMMIT_HASH"] = git_commit_hash
     env_variables["PARAM_NAMES"] = ",".join(get_param_names(code))
-    pkg_dataset = ("shopeeproductmatchingrequirements",)
+    pkg_dataset = "shopeeproductmatchingrequirements"
     if memo is not None:
         env_variables["MEMO"] = memo
 
