@@ -1,5 +1,5 @@
 import math
-from dataclasses import dataclass
+from typing import List
 
 import torch
 import torch.nn as nn
@@ -57,3 +57,11 @@ class ArcMarginProduct(nn.Module):
         output *= self.s
 
         return output
+
+
+def f1_score(infer_matches: List[List[str]], expect_matches: List[List[str]]) -> float:
+    intersection = [
+        (2 * len(set(a) & set(b))) / (len(a) + len(b))
+        for a, b in zip(infer_matches, expect_matches)
+    ]
+    return sum(intersection) / len(intersection)

@@ -209,3 +209,12 @@ def clean_up() -> None:
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     gc.collect()
+
+# https://www.kaggle.com/c/shopee-product-matching/discussion/233605
+def string_escape(s, encoding='utf-8'):
+    return (
+        s.encode('latin1')  # To bytes, required by 'unicode-escape'
+        .decode('unicode-escape')  # Perform the actual octal-escaping decode
+        .encode('latin1')  # 1:1 mapping back to bytes
+        .decode(encoding)
+    )  # Decode original encoding

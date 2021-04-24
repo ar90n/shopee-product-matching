@@ -5,12 +5,20 @@ import numpy as np
 from cuml import PCA
 from cuml.feature_extraction.text import TfidfVectorizer
 from cuml.neighbors import NearestNeighbors
+from sklearn import preprocessing
 
 
 class TfIdfEmbedding:
     def __init__(self, max_features: int = 15000, n_components: int = 5000) -> None:
+        def preprocessor(doc):
+            doc = doc.str.lower()
+            doc = doc.str.filter_alphanum(' ', keep=True)
+            doc = doc.str.filter_tokens(3)
+            #doc = doc[doc.str.match('\w\w\w+')]
+            return doc
+
         self.model = TfidfVectorizer(
-            stop_words="english", binary=True, max_features=max_features
+            stop_words="english", binary=True, max_features=max_features, preprocessor=preprocessor
         )
         self.pca = PCA(n_components=n_components)
 

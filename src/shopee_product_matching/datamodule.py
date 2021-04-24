@@ -14,6 +14,7 @@ from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 
 from .constants import Paths
+from .util import string_escape
 
 
 class ShopeeProp(Enum):
@@ -56,6 +57,8 @@ class ShopeeDataset(Dataset[ShopeeRecord]):
         self.df = df.reset_index()
         self.query = query
         self.dataset_type = self._detect_dataset_type(df)
+
+        self.df["title"] = self.df["title"].apply(string_escape)
 
     def __len__(self) -> int:
         return self.df.shape[0]
@@ -114,6 +117,7 @@ class ShopeeDataModule(pl.LightningDataModule):
         self,
         param: ShopeeDataModuleParam,
     ):
+        super().__init__()
         self.param = param
 
     def setup(self, stage: Optional[str] = None) -> None:
