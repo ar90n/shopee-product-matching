@@ -3,10 +3,10 @@ from torch import Tensor
 
 
 class AffineHead(nn.Module):
-    def __init__(self, out_dim: int = 512, dropout: float = 0.0) -> None:
+    def __init__(self, in_dim: int, out_dim: int = 512, dropout: float = 0.0) -> None:
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
-        self.fc = nn.LazyLinear(out_dim)
+        self.fc = nn.Linear(in_dim, out_dim)
         self.bn = nn.BatchNorm1d(out_dim)
 
         nn.init.xavier_normal_(self.fc.weight)

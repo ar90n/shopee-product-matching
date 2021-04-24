@@ -35,8 +35,8 @@ ShopeeRecord = NewType("ShopeeRecord", Dict[ShopeeProp, Union[Tensor, str]])
 class ShopeeQuery:
     posting_id: bool = True
     image: Union[bool, Callable[[np.ndarray], np.ndarray]] = False
-    title: bool = False
-    image_phash: bool = False
+    title: Union[bool, Callable[[str], np.ndarray]] = False
+    image_phash: Union[bool, Callable[[str], np.ndarray]] = False
     label_group: bool = False
 
 
@@ -58,8 +58,6 @@ class ShopeeDataset(Dataset[ShopeeRecord]):
         self.query = query
         self.dataset_type = self._detect_dataset_type(df)
 
-        self.df["title"] = self.df["title"].apply(string_escape)
-
     def __len__(self) -> int:
         return self.df.shape[0]
 
@@ -78,8 +76,12 @@ class ShopeeDataset(Dataset[ShopeeRecord]):
             record[ShopeeProp.image] = torch.from_numpy(
                 augment_image.transpose(2, 0, 1)
             )
-        if self.query.title:
-            record[ShopeeProp.title] = row.title
+        if isinstance(self.query.title, bool) and (self.query.title):
+            record[ShopeeProp.title] = torch.tensor(row.title)
+        if callable(self.query.title):
+            augment_title = self.query.title(row.title)
+            record[ShopeeProp.title] = torch.from_numpy(augment_title)
+
         if self.query.image_phash:
             record[ShopeeProp.image_phash] = row.image_phash
         if self.query.label_group:
@@ -120,7 +122,13 @@ class ShopeeDataModule(pl.LightningDataModule):
         super().__init__()
         self.param = param
 
-    def setup(self, stage: Optional[str] = None) -> None:
+    def setup(
+        self,
+        stage: Optional[str] = None,
+        train_df_preproc: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
+        valid_df_preproc: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
+        test_df_preproc: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
+    ) -> None:
         super().setup(stage=stage)
         train_full_df = pd.read_csv(Paths.shopee_product_matching / "train.csv")
         train_full_df["label_group"] = LabelEncoder().fit_transform(
@@ -129,10 +137,18 @@ class ShopeeDataModule(pl.LightningDataModule):
         train_df, valid_df = train_test_split(
             train_full_df, test_size=0.2, random_state=42
         )
+        test_df = pd.read_csv(Paths.shopee_product_matching / "test.csv")
+
+        if train_df_preproc is not None:
+            train_df = train_df_preproc(train_df)
         self.train_dataset = ShopeeDataset(train_df, self.param.train_query)
+
+        if valid_df_preproc is not None:
+            valid_df = valid_df_preproc(valid_df)
         self.valid_dataset = ShopeeDataset(valid_df, self.param.valid_query)
 
-        test_df = pd.read_csv(Paths.shopee_product_matching / "test.csv")
+        if test_df_preproc is not None:
+            test_df = test_df_preproc(test_df)
         self.test_dataset = ShopeeDataset(test_df, self.param.test_query)
 
     def train_dataloader(self) -> Any:
