@@ -14,21 +14,26 @@
 # ---
 
 # %%
-#%load_ext autoreload
-#%autoreload 2
+# %load_ext autoreload
+# %autoreload 2
 
 # %%
+import hashlib
+import numpy as np
+import pickle
+import pandas as pd
+from numpy.core.defchararray import title
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 
 import pandas as pd
 from shopee_product_matching import constants, storage
+from shopee_product_matching import util
 from shopee_product_matching.logger import get_logger
 from shopee_product_matching.metric import ArcMarginProduct
 from shopee_product_matching.system import TitleMetricLearning
 from shopee_product_matching.util import (JobType, finalize, get_device, string_escape,
                                           get_params_by_inspection, initialize)
-from shopee_product_matching.feature import TfIdfEmbedding
 from shopee_product_matching.datamodule import (ShopeeDataModule,
                                                 ShopeeDataModuleParam,
                                                 ShopeeQuery)
@@ -48,35 +53,53 @@ PCA_N_COMPONENTS = 5000
 HEAD_LAYERS = 1
 
 # %%
-initialize(SEED, JobType.Training, params=get_params_by_inspection())
-
-# %%
 shopee_dm_param = ShopeeDataModuleParam(
-    train_query=ShopeeQuery(title=True, label_group=True),
-    valid_query=ShopeeQuery(title=True, label_group=True),
-    test_query=ShopeeQuery(title=True),
+    train_query=ShopeeQuery(),
+    valid_query=ShopeeQuery(),
+    test_query=ShopeeQuery(),
 )
 shopee_dm = ShopeeDataModule(shopee_dm_param)
 shopee_dm.setup()
-# %%
-tfidf_embeddings = TfIdfEmbedding(max_features=TFIDF_MAX_FEATURES, n_components=PCA_N_COMPONENTS)
-tfidf_embeddings.fit(shopee_dm.train_dataset.df["title"])
-tfidf_model_path = tfidf_embeddings.save("tfidf.model")
-storage.save(tfidf_model_path)
+titles = shopee_dm.train_dataset.df["title"]
+titles = titles.apply(string_escape)
 
 # %%
-def title_embedding(df: pd.DataFrame) -> pd.DataFrame:
-    df["title"] = df["title"].apply(string_escape)
-    list_vecs = tfidf_embeddings(df["title"]).tolist()
-    df["title"] = pd.Series(list_vecs, index=df.index)
-    return df
-shopee_dm.setup(train_df_preproc=title_embedding, valid_df_preproc=title_embedding)
+from shopee_product_matching.tasks import fit_tfidf
+tfidf_model_path = fit_tfidf.main(titles)
+
+
+# %%
+train_all_df = pd.read_csv(util.get_input() / "shopee-product-matching" / "train.csv")
+titles_all = train_all_df["title"]
+
+# %%
+from shopee_product_matching.tasks import transform_tfidf
+tfidf_embedding_path = transform_tfidf.main(tfidf_model_path, titles_all)
+# %%
+initialize(SEED, JobType.Training, params=get_params_by_inspection())
+
+# %%
+storage.save(str(tfidf_model_path))
+# %%
+with open(tfidf_embedding_path, "rb") as fp:
+    tfidf_embeddings = pickle.load(fp)
+def title_embedding(title: str) -> np.ndarray:
+    hash = hashlib.sha224(title.encode()).hexdigest()
+    return tfidf_embeddings[hash]
+# %%
+shopee_dm_param = ShopeeDataModuleParam(
+    train_query=ShopeeQuery(title=title_embedding, label_group=True),
+    valid_query=ShopeeQuery(title=title_embedding, label_group=True),
+    test_query=ShopeeQuery(),
+)
+shopee_dm = ShopeeDataModule(shopee_dm_param)
+shopee_dm.setup()
 
 # %%
 from shopee_product_matching.network import AffineHead
 import torch.nn as nn
 
-head_layers = [AffineHead(tfidf_embeddings.num_features, out_dim=NUM_FEATURES)]
+head_layers = [AffineHead(PCA_N_COMPONENTS, out_dim=NUM_FEATURES)]
 for _ in range(HEAD_LAYERS - 1):
     head_layers.append(AffineHead(NUM_FEATURES, out_dim=NUM_FEATURES))
 head = nn.Sequential(*head_layers)
