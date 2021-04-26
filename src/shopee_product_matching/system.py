@@ -184,7 +184,7 @@ class TitleMetricLearning(pl.LightningModule):
         try:
             acc_outputs = _accumulate_outputs(outputs)
             infer_matches = find_matches(
-                acc_outputs["posting_ids"], acc_outputs["embeddings"]
+                acc_outputs["posting_ids"], acc_outputs["embeddings"], 0.6
             )
 
             expect_matches = _get_expect_matches(
@@ -211,7 +211,7 @@ class TitleMetricLearning(pl.LightningModule):
 
     def test_epoch_end(self, outputs: Dict[str, List[Any]]) -> None:
         acc_outputs = _accumulate_outputs(outputs)
-        matches = find_matches(acc_outputs["posting_ids"], acc_outputs["embeddings"])
+        matches = find_matches(acc_outputs["posting_ids"], acc_outputs["embeddings"], 0.6)
 
         save_submission_csv(
             acc_outputs["posting_ids"], matches, self.submission_filename
