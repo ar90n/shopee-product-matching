@@ -1,0 +1,4 @@
+method: grid
+parameters:
+  layers:
+    values: [24, 32, 64, 96, 128]
