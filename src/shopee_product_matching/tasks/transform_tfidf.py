@@ -1,14 +1,14 @@
-from typing import Dict, Any, Optional
-from pathlib import Path
-import pickle
 import hashlib
+import pickle
+import subprocess
 import sys
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Any, Dict, Optional
 
 import pandas as pd
 
 from shopee_product_matching.feature import TfIdfEmbedding
-import subprocess
-from tempfile import TemporaryDirectory
 
 
 def main(

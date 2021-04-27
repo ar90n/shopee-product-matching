@@ -3,9 +3,9 @@ import types
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import List, Optional
+from typing import List
 
-from .package import Package
+from shopee_product_matching.cli.package import Package
 
 
 def get_dependencies() -> List[str]:
@@ -48,7 +48,7 @@ def build_wheel(setup_py: Path, dist_dir: Path, bdist_dir: Path) -> Path:
 
 
 @contextmanager
-def working_directory(path: Path):
+def working_directory(path: Path) -> None:
     prev_cwd = Path.cwd()
     os.chdir(path)
     try:

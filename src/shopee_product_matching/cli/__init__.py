@@ -1,1 +1,1 @@
-from .main import main
+from shopee_product_matching.cli.main import main

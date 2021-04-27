@@ -3,12 +3,9 @@ import gzip
 import io
 import json
 import tarfile
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable
 
-import jupytext
-import nbformat as nbf
-
-from .package import Package
+from shopee_product_matching.cli.package import Package
 
 BOOTSTRAP_TEMPLATE: str = """def __bootstrap__():
     import sys
@@ -85,7 +82,7 @@ __bootstrap__()"""
 def create_bootstrap_code(
     pkg_encoded: str,
     pkg_dataset: str,
-    env_variables: Dict,
+    env_variables: Dict[str, str],
     dependencies: Iterable[str],
     secret_keys: Iterable[str],
     use_internet: bool = False,
@@ -113,33 +110,14 @@ def create_encoded_archive(pkgs: Iterable[Package]) -> str:
     return base64.b64encode(compressed).decode("utf-8")
 
 
-def create_prologue_cell(code: str) -> nbf.NotebookNode:
-    metadata = {"trusted": True, "_kg_hide-input": True, "_kg_hide-output": True}
-    return nbf.v4.new_code_cell(code, metadata=metadata)
-
-
-def create_bootstrap_cell(
-    pkg_encoded: str,
-    pkg_dataset: str,
-    env_variables: Dict[str, str],
-    dependencies: Iterable[str],
-    secret_keys: Iterable[str],
-    use_internet: bool = False,
-) -> nbf.NotebookNode:
-    code = create_bootstrap_code(
-        pkg_encoded=pkg_encoded,
-        pkg_dataset=pkg_dataset,
-        env_variables=env_variables,
-        dependencies=dependencies,
-        secret_keys=secret_keys,
-        use_internet=use_internet,
-    )
-    metadata = {"trusted": True, "_kg_hide-input": True, "_kg_hide-output": True}
-    return nbf.v4.new_code_cell(code, metadata=metadata)
+SCRIPT_TEMPLATE: str = """{prologue}
+{bootstrap_code}
+{script_body}
+"""
 
 
 def create_kernel(
-    code: str,
+    script_body: str,
     pkg_encoded: str,
     pkg_dataset: str,
     env_variables: Dict[str, str],
@@ -147,9 +125,8 @@ def create_kernel(
     secret_keys: Iterable[str],
     prologue: str,
     use_internet: bool = False,
-) -> nbf.NotebookNode:
-    notebook = jupytext.reads(code, fmt="py")
-    bootstrap_cell = create_bootstrap_cell(
+) -> str:
+    bootstrap_code = create_bootstrap_code(
         pkg_encoded=pkg_encoded,
         pkg_dataset=pkg_dataset,
         env_variables=env_variables,
@@ -157,14 +134,9 @@ def create_kernel(
         secret_keys=secret_keys,
         use_internet=use_internet,
     )
-    notebook.cells.insert(0, bootstrap_cell)
-
-    if prologue != "":
-        prologue_cell = create_prologue_cell(prologue)
-        notebook.cells.insert(0, prologue_cell)
-
-    notebook.metadata.papermill = {}
-    for cell in notebook.cells:
-        if not hasattr(cell.metadata, "tags"):
-            cell.metadata.tags = []
-    return notebook
+    return SCRIPT_TEMPLATE.format(
+        bootstrap_code=bootstrap_code,
+        script_body=script_body,
+        prologue=prologue,
+        encoding="utf8",
+    )

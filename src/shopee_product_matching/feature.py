@@ -1,14 +1,14 @@
-from typing import Iterable, List, Union
 from pathlib import Path
+from typing import Iterable, List, Union
 
 import cudf
 import numpy as np
 import pandas as pd
-from sklearn.decomposition import PCA
 from cuml.feature_extraction.text import TfidfVectorizer
 from cuml.neighbors import NearestNeighbors
-from sklearn import preprocessing
 from joblib import dump, load
+from sklearn import preprocessing
+from sklearn.decomposition import PCA
 
 
 class TfIdfEmbedding:

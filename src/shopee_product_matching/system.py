@@ -10,9 +10,9 @@ from torch import nn
 
 from .datamodule import ShopeeProp
 from .feature import find_matches
+from .metric import f1_score
 from .scheduler import ADSRScheduler
 from .util import save_submission_csv
-from .metric import f1_score
 
 
 class ImageMetricLearning(pl.LightningModule):
@@ -211,11 +211,14 @@ class TitleMetricLearning(pl.LightningModule):
 
     def test_epoch_end(self, outputs: Dict[str, List[Any]]) -> None:
         acc_outputs = _accumulate_outputs(outputs)
-        matches = find_matches(acc_outputs["posting_ids"], acc_outputs["embeddings"], 0.6)
+        matches = find_matches(
+            acc_outputs["posting_ids"], acc_outputs["embeddings"], 0.6
+        )
 
         save_submission_csv(
             acc_outputs["posting_ids"], matches, self.submission_filename
         )
+
 
 def _accumulate_outputs(outputs: List[Dict[str, List[Any]]]) -> Dict[str, Any]:
     embeddings = []

@@ -4,11 +4,11 @@ from typing import Any, Iterable
 import typer
 from kaggle import KaggleApi
 from kaggle.api_client import ApiClient
-from kaggle.models.dataset_new_request import DatasetNewRequest
-from kaggle.models.dataset_new_version_request import DatasetNewVersionRequest
-from kaggle.models.kaggle_models_extended import (DatasetNewResponse,
-                                                  DatasetNewVersionResponse,
-                                                  KernelPushResponse)
+from kaggle.models.kaggle_models_extended import (
+    DatasetNewResponse,
+    DatasetNewVersionResponse,
+    KernelPushResponse,
+)
 from kaggle.models.kernel_push_request import KernelPushRequest
 
 
@@ -69,7 +69,7 @@ def push(
         new_title=title,
         text=body,
         language="python",
-        kernel_type="notebook",
+        kernel_type="script",
         is_private=not is_public,
         enable_gpu=not disable_gpu,
         enable_internet=not disable_internet,

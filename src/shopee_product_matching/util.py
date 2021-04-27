@@ -87,6 +87,10 @@ def get_input() -> Path:
 def get_requirements() -> Path:
     return get_input() / "shopeeproductmatchingrequirements"
 
+def get_competition_data() -> Path:
+    return get_input() / "shopee-product-matching"
+
+
 
 def get_device(n: Optional[int] = None) -> Any:
     if is_tpu_available():
@@ -131,6 +135,13 @@ def exit() -> None:
         sys.exit(1)
 
 
+def _get_group() -> str:
+    if "EXPERIMENT_NAME" in os.environ:
+        return os.environ["EXPERIMENT_NAME"]
+    else:
+        return Path(sys.argv[0]).absolute().parent.stem
+
+
 def initialize(
     seed: int,
     job_type: JobType,
@@ -140,7 +151,7 @@ def initialize(
     pl.seed_everything(seed)
 
     if has_wandb and job_type == JobType.Training:
-        group = os.environ.get("EXPERIMENT_NAME")
+        group = _get_group()
 
         wandb.init(
             id=id,
@@ -210,11 +221,12 @@ def clean_up() -> None:
         torch.cuda.empty_cache()
     gc.collect()
 
+
 # https://www.kaggle.com/c/shopee-product-matching/discussion/233605
-def string_escape(s, encoding='utf-8'):
+def string_escape(s, encoding="utf-8"):
     return (
-        s.encode('latin1')  # To bytes, required by 'unicode-escape'
-        .decode('unicode-escape')  # Perform the actual octal-escaping decode
-        .encode('latin1')  # 1:1 mapping back to bytes
+        s.encode("latin1")  # To bytes, required by 'unicode-escape'
+        .decode("unicode-escape")  # Perform the actual octal-escaping decode
+        .encode("latin1")  # 1:1 mapping back to bytes
         .decode(encoding)
     )  # Decode original encoding
