@@ -35,6 +35,7 @@ BOOTSTRAP_TEMPLATE: str = """def __bootstrap__():
                 _find_pkgs(p)
             else:
                 pkg_path_list.append(str(p))
+    print("------- found packages ------")
     if "{pkg_dataset}" != "":
         pip_pkgs_path = Path.cwd().parent / "input" / "{pkg_dataset}" / "pip"
         _find_pkgs(pip_pkgs_path)
@@ -54,6 +55,7 @@ BOOTSTRAP_TEMPLATE: str = """def __bootstrap__():
                 print(output)
             except:
                 pass
+    print("------- finish package install ------")
     # this is base64 encoded source code
     tar_io = io.BytesIO(gzip.decompress(base64.b64decode("{pkg_encoded}")))
     with TemporaryDirectory() as temp_dir:
@@ -64,6 +66,7 @@ BOOTSTRAP_TEMPLATE: str = """def __bootstrap__():
                 pkg_path.write_bytes(content_bytes)
                 output = subprocess.run(["pip", "install", "--no-deps", pkg_path], capture_output=True, encoding="utf-8", check=True).stdout
                 print(output)
+    print("------- finish shopee-product-matching install ------")
     sys.path.append("/kaggle/working")
     # Add secrets to environment variables
     if {use_internet} and has_kaggle_packages:

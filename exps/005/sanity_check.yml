@@ -1,0 +1,18 @@
+method: grid
+parameters:
+  overfit_batches:
+    values:
+      - 0.01
+  backbone:
+    values: 
+      - "efficientnet_b0"
+  max_epochs:
+    values: 
+      - 5
+  fold:
+    values:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4

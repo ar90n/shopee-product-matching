@@ -1,7 +1,9 @@
 from typing import Dict, Iterable
 
-from shopee_product_matching.cli.script import create_encoded_archive, create_kernel
-from shopee_product_matching.cli.setuptools import build_packages, get_dependencies
+from shopee_product_matching.cli.script import (create_encoded_archive,
+                                                create_kernel)
+from shopee_product_matching.cli.setuptools import (build_packages,
+                                                    get_dependencies)
 
 
 def build(

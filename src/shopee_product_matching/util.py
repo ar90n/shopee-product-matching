@@ -1,6 +1,7 @@
 import gc
 import os
 import sys
+from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional
@@ -10,6 +11,8 @@ import pandas as pd
 import pytorch_lightning as pl
 import torch
 from albumentations import Compose
+
+from shopee_product_matching.constants import Paths, seed
 
 try:
     import torch_xla
@@ -84,14 +87,6 @@ def get_input() -> Path:
     raise EnvironmentError("input is not found")
 
 
-def get_requirements() -> Path:
-    return get_input() / "shopeeproductmatchingrequirements"
-
-def get_competition_data() -> Path:
-    return get_input() / "shopee-product-matching"
-
-
-
 def get_device(n: Optional[int] = None) -> Any:
     if is_tpu_available():
         return xm.xla_device(n=n, devkind="TPU")
@@ -102,11 +97,7 @@ def get_device(n: Optional[int] = None) -> Any:
 
 
 def get_project() -> str:
-    return os.environ.get("WANDB_PROJECT", "shopee-product-matching")
-
-
-def get_notebook_name() -> Optional[str]:
-    return os.environ.get("NOTEBOOK_NAME")
+    return "shopee-product-matching"
 
 
 def clean_up() -> None:
@@ -142,38 +133,36 @@ def _get_group() -> str:
         return Path(sys.argv[0]).absolute().parent.stem
 
 
-def initialize(
-    seed: int,
+@contextmanager
+def context(
+    config_defaults: Dict[str, Any],
     job_type: JobType,
-    params: Optional[Dict[str, Any]] = None,
-    id: Optional[str] = None,
 ) -> None:
     pl.seed_everything(seed)
 
-    if has_wandb and job_type == JobType.Training:
-        group = _get_group()
+    mode = "online" if job_type == JobType.Training else "disabled"
+    wandb.init(
+        group=_get_group(),
+        job_type=str(job_type),
+        project=get_project(),
+        config=config_defaults,
+        mode=mode,
+    )
+    print(f"project: {get_project()}")
 
-        wandb.init(
-            id=id,
-            name=get_notebook_name(),
-            group=group,
-            job_type=str(job_type),
-            project=get_project(),
-            resume="allow",
-            config=params,
-        )
+    commit_hash = os.environ.get("GIT_COMMIT_HASH")
+    if commit_hash is not None:
+        wandb.config.update({"commit_hash": commit_hash})
 
-        commit_hash = os.environ.get("GIT_COMMIT_HASH")
-        if commit_hash is not None:
-            wandb.config.update({"commit_hash": commit_hash})
+    memo = os.environ.get("MEMO")
+    if memo is not None:
+        wandb.config.update({"memo": memo})
 
-        memo = os.environ.get("MEMO")
-        if memo is not None:
-            wandb.config.update({"memo": memo})
-
-
-def finalize() -> None:
-    wandb.finish()
+    try:
+        yield wandb.config
+    finally:
+        if mode == "online":
+            wandb.finish()
 
 
 def pass_as_image(func: Compose) -> Callable[[np.ndarray], np.ndarray]:
@@ -230,3 +219,9 @@ def string_escape(s, encoding="utf-8"):
         .encode("latin1")  # 1:1 mapping back to bytes
         .decode(encoding)
     )  # Decode original encoding
+
+
+def get_model_path(model_name: str) -> Path:
+    if is_kaggle():
+        model_name = "".join(c for c in model_name if c != "=")
+    return Paths.requirements / model_name

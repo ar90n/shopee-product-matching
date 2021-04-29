@@ -1,14 +1,14 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, NewType, Optional, Union, cast
+from typing import (Any, Callable, Dict, List, NewType, Optional, Tuple, Union,
+                    cast)
 
 import cv2
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import torch
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
@@ -33,153 +33,161 @@ ShopeeRecord = NewType("ShopeeRecord", Dict[ShopeeProp, Union[Tensor, str]])
 
 @dataclass
 class ShopeeQuery:
-    posting_id: bool = True
-    image: Union[bool, Callable[[np.ndarray], np.ndarray]] = False
-    title: Union[bool, Callable[[str], np.ndarray]] = False
-    image_phash: Union[bool, Callable[[str], np.ndarray]] = False
-    label_group: bool = False
-
-
-class DatasetType(Enum):
-    train: str = "train"
-    test: str = "test"
-
-    def __str__(self) -> str:
-        return self.value
+    posting_id: Optional[Callable[[Union[str, int, float]], torch.Tensor]] = None
+    image: Optional[Callable[[Union[str, int, float]], torch.Tensor]] = None
+    title: Optional[Callable[[Union[str, int, float]], torch.Tensor]] = None
+    image_phash: Optional[Callable[[Union[str, int, float]], torch.Tensor]] = None
+    label_group: Optional[Callable[[Union[str, int, float]], torch.Tensor]] = None
 
 
 class ShopeeDataset(Dataset[ShopeeRecord]):
     df: pd.DataFrame
     query: ShopeeQuery
-    dataset_type: DatasetType
 
     def __init__(self, df: pd.DataFrame, query: ShopeeQuery):
         self.df = df.reset_index()
         self.query = query
-        self.dataset_type = self._detect_dataset_type(df)
 
     def __len__(self) -> int:
         return self.df.shape[0]
 
     def __getitem__(self, index: int) -> ShopeeRecord:
         row = self.df.iloc[index]
-        image = cv2.imread(str(self._get_image_path(row.image)))
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         record = {}
-        if self.query.posting_id:
-            record[ShopeeProp.posting_id] = row.posting_id
-        if isinstance(self.query.image, bool) and self.query.image:
-            record[ShopeeProp.image] = torch.from_numpy(image.tranpose(2, 0, 1))
-        if callable(self.query.image):
-            augment_image = self.query.image(image)
-            record[ShopeeProp.image] = torch.from_numpy(
-                augment_image.transpose(2, 0, 1)
-            )
-        if isinstance(self.query.title, bool) and (self.query.title):
-            record[ShopeeProp.title] = torch.tensor(row.title)
-        if callable(self.query.title):
-            augment_title = self.query.title(row.title)
-            record[ShopeeProp.title] = torch.from_numpy(augment_title)
-
-        if self.query.image_phash:
-            record[ShopeeProp.image_phash] = row.image_phash
-        if self.query.label_group:
-            record[ShopeeProp.label_group] = torch.tensor(row.label_group)
+        if self.query.posting_id is not None:
+            record[ShopeeProp.posting_id] = self.query.posting_id(row.posting_id)
+        if self.query.image is not None:
+            record[ShopeeProp.image] = self.query.image(row.image)
+        if self.query.title is not None:
+            record[ShopeeProp.title] = self.query.title(row.title)
+        if self.query.image_phash is not None:
+            record[ShopeeProp.image_phash] = self.query.image_phash(row.image_phash)
+        if self.query.label_group is not None:
+            record[ShopeeProp.label_group] = self.query.label_group(row.label_group)
         return cast(ShopeeRecord, record)
-
-    def _detect_dataset_type(self, df: pd.DataFrame) -> DatasetType:
-        if df.iloc[0].posting_id.startswith("train"):
-            return DatasetType.train
-        else:
-            return DatasetType.test
-
-    def _get_image_path(self, image: str) -> Path:
-        if self.dataset_type == DatasetType.train:
-            return Paths.shopee_product_matching / "train_images" / image
-        else:
-            return Paths.shopee_product_matching / "test_images" / image
 
 
 @dataclass
-class ShopeeDataModuleParam:
-    train_query: ShopeeQuery
-    valid_query: ShopeeQuery
-    test_query: ShopeeQuery
-    train_batch_size: int = 16
-    valid_batch_size: int = 16
-    test_batch_size: int = 16
-    num_workers: int = 4
+class ShopeeDataModuleQueries:
+    train: Optional[ShopeeQuery] = None
+    valid: Optional[ShopeeQuery] = None
+    test: Optional[ShopeeQuery] = None
+
+
+DatasetTransform = Callable[[pd.DataFrame], pd.DataFrame]
+DatasetSplit = Callable[[pd.DataFrame, Any], Tuple[pd.DataFrame, pd.DataFrame]]
+
+
+@dataclass
+class ShopeeDataModuleTransforms:
+    train: Optional[DatasetTransform] = None
+    valid: Optional[DatasetTransform] = None
+    test: Optional[DatasetTransform] = None
 
 
 class ShopeeDataModule(pl.LightningDataModule):
-    param: ShopeeDataModuleParam
+    _config: Any
+    _queries: ShopeeDataModuleQueries
+    _train_valid_split: DatasetSplit
+    _transforms: ShopeeDataModuleTransforms
+    _train_dataset: Optional[ShopeeDataset] = None
+    _valid_dataset: Optional[ShopeeDataset] = None
+    _test_dataset: Optional[ShopeeDataset] = None
 
     def __init__(
         self,
-        param: ShopeeDataModuleParam,
+        config: Any,
+        queries: ShopeeDataModuleQueries,
+        train_valid_split: DatasetSplit,
+        transforms: ShopeeDataModuleTransforms = ShopeeDataModuleTransforms(),
     ):
         super().__init__()
-        self.param = param
+        self._config = config
+        self._queries = queries
+        self._train_valid_split = train_valid_split
+        self._transforms = transforms
 
     def setup(
         self,
         stage: Optional[str] = None,
-        train_df_preproc: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
-        valid_df_preproc: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
-        test_df_preproc: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
     ) -> None:
         super().setup(stage=stage)
-        train_full_df = pd.read_csv(Paths.shopee_product_matching / "train.csv")
-        train_full_df["label_group"] = LabelEncoder().fit_transform(
-            train_full_df["label_group"]
+        train_full_df = cast(
+            pd.DataFrame,
+            pd.read_csv(Paths.shopee_product_matching / "train.csv", index_col=0),
         )
-        train_df, valid_df = train_test_split(
-            train_full_df, test_size=0.2, random_state=42
+        train_df, valid_df = self._train_valid_split(train_full_df, self._config)
+
+        test_df = pd.read_csv(Paths.shopee_product_matching / "test.csv", index_col=0)
+
+        self._train_dataset = self._setup_dataset(
+            train_df,
+            self._queries.train,
+            self._transforms.train,
         )
-        test_df = pd.read_csv(Paths.shopee_product_matching / "test.csv")
+        self._valid_dataset = self._setup_dataset(
+            valid_df,
+            self._queries.valid,
+            self._transforms.valid,
+        )
+        self._test_dataset = self._setup_dataset(
+            test_df,
+            self._queries.test,
+            self._transforms.test,
+        )
 
-        if train_df_preproc is not None:
-            train_df = train_df_preproc(train_df)
-        self.train_dataset = ShopeeDataset(train_df, self.param.train_query)
+    def _setup_dataset(
+        self,
+        df: pd.DataFrame,
+        query: Optional[ShopeeQuery],
+        transform: Optional[DatasetTransform],
+    ) -> Optional[ShopeeDataset]:
+        if query is None:
+            return None
 
-        if valid_df_preproc is not None:
-            valid_df = valid_df_preproc(valid_df)
-        self.valid_dataset = ShopeeDataset(valid_df, self.param.valid_query)
-
-        if test_df_preproc is not None:
-            test_df = test_df_preproc(test_df)
-        self.test_dataset = ShopeeDataset(test_df, self.param.test_query)
+        if transform is not None:
+            df = transform(df)
+        return ShopeeDataset(df, query)
 
     def train_dataloader(self) -> Any:
+        if self._train_dataset is None:
+            raise ValueError("train dataset is not initialized")
+
         return DataLoader(
-            self.train_dataset,
-            batch_size=self.param.train_batch_size,
+            self._train_dataset,
+            batch_size=self._config.train_batch_size,
             pin_memory=True,
             drop_last=True,
-            num_workers=self.param.num_workers,
+            num_workers=self._config.num_workers,
         )
 
     def val_dataloader(
         self,
     ) -> Union[DataLoader[ShopeeRecord], List[DataLoader[ShopeeRecord]]]:
+        if self._valid_dataset is None:
+            raise ValueError("valid dataset is not initialized")
+
         return DataLoader(
-            self.valid_dataset,
-            batch_size=self.param.valid_batch_size,
+            self._valid_dataset,
+            batch_size=self._config.valid_batch_size,
             shuffle=False,
             pin_memory=True,
             drop_last=False,
-            num_workers=self.param.num_workers,
+            num_workers=self._config.num_workers,
         )
 
     def test_dataloader(
         self,
     ) -> Union[DataLoader[ShopeeRecord], List[DataLoader[ShopeeRecord]]]:
+        if self._test_dataset is None:
+            raise ValueError("test dataset is not initialized")
+
         return DataLoader(
-            self.test_dataset,
-            batch_size=self.param.test_batch_size,
+            self._test_dataset,
+            batch_size=self._config.test_batch_size,
             shuffle=False,
             pin_memory=True,
             drop_last=False,
-            num_workers=self.param.test_batch_size,
+            num_workers=self._config.test_batch_size,
         )

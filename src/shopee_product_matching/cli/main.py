@@ -114,9 +114,11 @@ def push(
     disable_gpu: bool = False,
     disable_internet: bool = False,
     strict: bool = False,
+    sweep_count: int = 1,
 ) -> None:
     envs = _parse_extra_args(ctx.args)
-    envs["WANDB_SWEEP_ID"] = sweep_id
+    envs["SWEEP_ID"] = sweep_id
+    envs["SWEEP_COUNT"] = str(sweep_count)
 
     body = _build(
         input=code_file,

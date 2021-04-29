@@ -2,9 +2,9 @@ import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import GroupKFold
 
-from shopee_product_matching.util import get_competition_data
+from shopee_product_matching.constants import Paths
 
-df = pd.read_csv(get_competition_data() / "train.csv")
+df = pd.read_csv(Paths.shopee_product_matching / "train.csv")
 
 gkf = GroupKFold(n_splits=5)
 df['fold'] = -1

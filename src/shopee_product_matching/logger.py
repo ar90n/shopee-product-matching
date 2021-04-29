@@ -7,7 +7,7 @@ from pytorch_lightning.loggers.base import DummyLogger
 from pytorch_lightning.loggers.comet import CometLogger
 from pytorch_lightning.loggers.wandb import WandbLogger
 
-from .util import get_notebook_name, get_project
+from .util import get_project
 
 
 def get_logger(
@@ -23,9 +23,7 @@ def get_logger(
 
 def get_wandb_logger(name: Optional[str] = None) -> WandbLogger:
     offline = "WANDB_API_KEY" not in os.environ
-    return WandbLogger(
-        name=get_notebook_name(), offline=offline, project=get_project(), log_model=True
-    )
+    return WandbLogger(offline=offline, project=get_project(), log_model=True)
 
 
 def get_cometml_logger(name: Optional[str] = None) -> CometLogger:

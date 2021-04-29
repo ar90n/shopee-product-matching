@@ -1,7 +1,5 @@
 from pathlib import Path
 
-from shopee_product_matching.util import get_input
-
 
 class _TrainData:
     @property
@@ -28,8 +26,17 @@ class _TrainData:
 class _Paths:
     @property
     def shopee_product_matching(self) -> Path:
+        from shopee_product_matching.util import get_input
+
         return get_input() / "shopee-product-matching"
+
+    @property
+    def requirements(self) -> Path:
+        from shopee_product_matching.util import get_input
+
+        return get_input() / "shopeeproductmatchingrequirements"
 
 
 Paths = _Paths()
 TrainData = _TrainData()
+seed = 42

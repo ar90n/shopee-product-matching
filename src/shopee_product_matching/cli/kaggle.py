@@ -4,11 +4,9 @@ from typing import Any, Iterable
 import typer
 from kaggle import KaggleApi
 from kaggle.api_client import ApiClient
-from kaggle.models.kaggle_models_extended import (
-    DatasetNewResponse,
-    DatasetNewVersionResponse,
-    KernelPushResponse,
-)
+from kaggle.models.kaggle_models_extended import (DatasetNewResponse,
+                                                  DatasetNewVersionResponse,
+                                                  KernelPushResponse)
 from kaggle.models.kernel_push_request import KernelPushRequest
 
 
