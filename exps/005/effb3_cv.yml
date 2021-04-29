@@ -1,0 +1,10 @@
+name: effb3-cv
+method: grid
+parameters:
+  fold:
+    values:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
