@@ -5,7 +5,6 @@ import git
 import typer
 from dotenv import load_dotenv
 from kaggle.models.kaggle_models_extended import KernelPushResponse
-
 from shopee_product_matching.cli import kaggle
 from shopee_product_matching.cli.build import build as kernel_build
 

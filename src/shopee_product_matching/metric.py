@@ -1,10 +1,23 @@
 import math
-from typing import List
+from typing import Any, List
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Parameter
+
+
+def create_metric(
+    name: str, num_features: int, num_classes: int, **kwargs: Any
+) -> nn.Module:
+    if name == "adacos":
+        return AdaCos(num_features=num_features, num_classes=num_classes, **kwargs)
+    elif name == "arcface":
+        return ArcMarginProduct(
+            num_features=num_features, num_classes=num_classes, **kwargs
+        )
+    else:
+        raise ValueError("unknown metric name")
 
 
 class AdaCos(nn.Module):
@@ -51,20 +64,20 @@ class AdaCos(nn.Module):
 class ArcMarginProduct(nn.Module):
     def __init__(
         self,
-        in_features: int,
-        out_features: int,
+        num_features: int,
+        num_classes: int,
         s: float = 30.0,
         m: float = 0.50,
         easy_margin: bool = False,
         ls_eps: float = 0.0,
     ):
         super(ArcMarginProduct, self).__init__()
-        self.in_features = in_features
-        self.out_features = out_features
+        self.in_features = num_features
+        self.out_features = num_classes
         self.s = s
         self.m = m
         self.ls_eps = ls_eps  # label smoothing
-        self.weight = Parameter(torch.FloatTensor(out_features, in_features))
+        self.weight = Parameter(torch.FloatTensor(num_classes, num_features))
         nn.init.xavier_uniform_(self.weight)
 
         self.easy_margin = easy_margin

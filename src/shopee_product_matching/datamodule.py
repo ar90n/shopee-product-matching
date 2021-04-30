@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import (Any, Callable, Dict, List, NewType, Optional, Tuple, Union,
-                    cast)
+from typing import Any, Callable, Dict, List, NewType, Optional, Tuple, Union, cast
 
 import cv2
 import numpy as np
@@ -89,7 +88,7 @@ class ShopeeDataModuleTransforms:
 class ShopeeDataModule(pl.LightningDataModule):
     _config: Any
     _queries: ShopeeDataModuleQueries
-    _train_valid_split: DatasetSplit
+    _train_valid_split: Optional[DatasetSplit]
     _transforms: ShopeeDataModuleTransforms
     _train_dataset: Optional[ShopeeDataset] = None
     _valid_dataset: Optional[ShopeeDataset] = None
@@ -99,7 +98,7 @@ class ShopeeDataModule(pl.LightningDataModule):
         self,
         config: Any,
         queries: ShopeeDataModuleQueries,
-        train_valid_split: DatasetSplit,
+        train_valid_split: Optional[DatasetSplit] = None,
         transforms: ShopeeDataModuleTransforms = ShopeeDataModuleTransforms(),
     ):
         super().__init__()
@@ -117,10 +116,11 @@ class ShopeeDataModule(pl.LightningDataModule):
             pd.DataFrame,
             pd.read_csv(Paths.shopee_product_matching / "train.csv", index_col=0),
         )
-        train_df, valid_df = self._train_valid_split(train_full_df, self._config)
-
-        test_df = pd.read_csv(Paths.shopee_product_matching / "test.csv", index_col=0)
-
+        if self._train_valid_split is not None:
+            train_df, valid_df = self._train_valid_split(train_full_df, self._config)
+        else:
+            train_df = train_full_df
+            valid_df = train_full_df
         self._train_dataset = self._setup_dataset(
             train_df,
             self._queries.train,
@@ -131,6 +131,8 @@ class ShopeeDataModule(pl.LightningDataModule):
             self._queries.valid,
             self._transforms.valid,
         )
+
+        test_df = pd.read_csv(Paths.shopee_product_matching / "test.csv", index_col=0)
         self._test_dataset = self._setup_dataset(
             test_df,
             self._queries.test,
@@ -182,7 +184,6 @@ class ShopeeDataModule(pl.LightningDataModule):
     ) -> Union[DataLoader[ShopeeRecord], List[DataLoader[ShopeeRecord]]]:
         if self._test_dataset is None:
             raise ValueError("test dataset is not initialized")
-
         return DataLoader(
             self._test_dataset,
             batch_size=self._config.test_batch_size,

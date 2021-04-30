@@ -2,10 +2,9 @@ from typing import Any, Callable, Dict
 
 import pandas as pd
 import torch
+from shopee_product_matching.constants import Paths
 from torchvision.io import read_image
 from torchvision.transforms import Compose, Normalize, Resize
-
-from shopee_product_matching.constants import Paths
 
 ImageTransform = Callable[[str], torch.Tensor]
 
@@ -44,7 +43,7 @@ def imread(data_type: str) -> Callable[[Any], Any]:
 def read_resize_normalize(config: Any, data_type: str) -> Callable[[Any], Any]:
     return Compose(
         [
-            imread("train_images"),
+            imread(data_type),
             Resize(size=(config.image_size, config.image_size)),
             Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]

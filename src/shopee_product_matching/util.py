@@ -5,13 +5,14 @@ from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional
+from tempfile import TemporaryDirectory
 
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import torch
 from albumentations import Compose
-
+from typing_extensions import final
 from shopee_product_matching.constants import Paths, seed
 
 try:
@@ -74,6 +75,9 @@ def is_notebook() -> bool:
 
 
 def get_input() -> Path:
+    if is_kaggle():
+        return Path("/kaggle/input")
+
     cur_path = Path.cwd()
     while True:
         candidate = cur_path / "input"
@@ -148,7 +152,6 @@ def context(
         config=config_defaults,
         mode=mode,
     )
-    print(f"project: {get_project()}")
 
     commit_hash = os.environ.get("GIT_COMMIT_HASH")
     if commit_hash is not None:
@@ -163,6 +166,24 @@ def context(
     finally:
         if mode == "online":
             wandb.finish()
+
+
+@contextmanager
+def ensemble() -> None:
+
+    cur_dir = str(Path.cwd().absolute())
+    submissions = []
+    with TemporaryDirectory(dir=cur_dir) as temp:
+        try:
+            os.chdir(temp)
+            yield
+
+            for p in Path.cwd(temp).glob("submission*.csv"):
+                df = pd.read_csv(p, index_col=0)
+                submissions.append(df)
+        finally:
+            os.chdir(cur_dir)
+    print(submissions)
 
 
 def pass_as_image(func: Compose) -> Callable[[np.ndarray], np.ndarray]:

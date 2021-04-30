@@ -7,7 +7,6 @@ from tempfile import TemporaryDirectory
 from typing import Any, Dict, Optional
 
 import pandas as pd
-
 from shopee_product_matching.feature import TfIdfEmbedding
 
 

@@ -2,7 +2,6 @@ from typing import Any, Optional
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
-
 from shopee_product_matching import storage
 from shopee_product_matching.logger import get_logger
 
@@ -27,36 +26,38 @@ class ShopeeTrainer(pl.Trainer):
         config: Any,
         precision: int = 16,
         gpus: int = 1,
-        monitor: str = "valid_loss",
+        monitor: Optional[str] = "valid_loss",
         mode: str = "min",
         ckpt_filename_base: Optional[str] = None,
     ) -> None:
         n_fold = config.get("n_fold")
         ckpt_filename_fmt = _get_ckpt_filename_fmt(config, n_fold, ckpt_filename_base)
 
-        self._checkpoint_callback = ModelCheckpoint(
-            verbose=True,
-            dirpath="checkpoints",
-            filename=ckpt_filename_fmt,
-            monitor=monitor,
-            mode=mode,
-        )
-        early_stopping_callback = EarlyStopping(
-            patience=config.early_stop_patience,
-            verbose=True,
-            monitor=monitor,
-            mode=mode,
-        )
-        callbacks = [self._checkpoint_callback, early_stopping_callback]
+        callbacks =[]
+        if monitor is not None:
+            self._checkpoint_callback = ModelCheckpoint(
+                verbose=True,
+                dirpath="checkpoints",
+                filename=ckpt_filename_fmt,
+                monitor=monitor,
+                mode=mode,
+            )
+            early_stopping_callback = EarlyStopping(
+                patience=config.early_stop_patience,
+                verbose=True,
+                monitor=monitor,
+                mode=mode,
+            )
+            callbacks = [self._checkpoint_callback, early_stopping_callback]
 
         super().__init__(
             precision=precision,
             gpus=gpus,
             callbacks=callbacks,
-            max_epochs=config.max_epochs,
-            overfit_batches=config.overfit_batches,
-            fast_dev_run=config.fast_dev_run,
             logger=get_logger(),
+            max_epochs=config.get("max_epochs"),
+            overfit_batches=config.get("overfit_batches", 0.0),
+            fast_dev_run=config.get("fast_dev_run", False),
         )
 
     def save_best_model(self) -> None:

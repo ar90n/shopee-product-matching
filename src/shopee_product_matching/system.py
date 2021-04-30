@@ -23,8 +23,8 @@ class ImageMetricLearning(pl.LightningModule):
 
     def __init__(
         self,
-        param,
         backbone,
+        param=Param(),
         head=nn.Identity(),
         metric=nn.Identity(),
         loss=nn.CrossEntropyLoss(),
