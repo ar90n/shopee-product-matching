@@ -21,7 +21,6 @@ import pytorch_lightning as pl
 import timm
 from shopee_product_matching.transform import read_resize_normalize, identity
 from shopee_product_matching import constants
-from shopee_product_matching.logger import get_logger
 from shopee_product_matching.metric import create_metric
 from shopee_product_matching.trainer import ShopeeTrainer
 from shopee_product_matching.system import ImageMetricLearning
@@ -53,7 +52,10 @@ def get_config_defaults() -> Dict[str, Any]:
         "image_size": 512,
         "backbone": "efficientnet_b3",
         "metric": "arcface",
-        "checkpoint_filenames": ["exp-001-epoch17-valid_loss1.02.ckpt", "exp-001-epoch17-valid_loss1.02_cp.ckpt"],
+        "checkpoint_filenames": [
+            "exp-001-epoch17-valid_loss1.02.ckpt",
+            "exp-001-epoch17-valid_loss1.02_cp.ckpt",
+        ],
     }
 
 

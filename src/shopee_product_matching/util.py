@@ -169,7 +169,14 @@ def context(
 
 
 @contextmanager
-def ensemble() -> None:
+def ensemble(filename="submission.csv") -> None:
+    def merge_matches(submissions: List[pd.DataFrame]) -> pd.DataFrame:
+        return (
+            pd.concat(submissions)
+            .groupby("posting_id")
+            .sum()
+            .applymap(lambda x: " ".join(set(x)))
+        )
 
     cur_dir = str(Path.cwd().absolute())
     submissions = []
@@ -178,12 +185,14 @@ def ensemble() -> None:
             os.chdir(temp)
             yield
 
-            for p in Path.cwd(temp).glob("submission*.csv"):
-                df = pd.read_csv(p, index_col=0)
+            for p in Path(temp).glob("submission*.csv"):
+                df = pd.read_csv(p, index_col=0).applymap(lambda x: x.split())
                 submissions.append(df)
         finally:
             os.chdir(cur_dir)
-    print(submissions)
+
+    submission = merge_matches(submissions)
+    submission.to_csv(filename)
 
 
 def pass_as_image(func: Compose) -> Callable[[np.ndarray], np.ndarray]:
