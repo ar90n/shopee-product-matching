@@ -64,7 +64,7 @@ def get_config_defaults() -> Dict[str, Any]:
         "valid_batch_size": 16,
         "num_workers": 4,
         "max_epochs": 20,
-        "backbone": "efficientnet_b3",
+        "backbone": "efficientnet_b0",
         "image_size": 512,
         "overfit_batches": 0,
         "fast_dev_run": False,

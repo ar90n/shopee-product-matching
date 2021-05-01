@@ -15,6 +15,7 @@
 
 
 # %%
+from pathlib import Path
 from typing import Dict, Any, Tuple
 
 import pytorch_lightning as pl
@@ -50,11 +51,14 @@ def get_config_defaults() -> Dict[str, Any]:
         "test_batch_size": 64,
         "num_workers": 4,
         "image_size": 512,
-        "backbone": "efficientnet_b3",
+        "backbone": "efficientnet_b0",
         "metric": "arcface",
         "checkpoint_filenames": [
-            "exp-001-epoch17-valid_loss1.02.ckpt",
-            "exp-001-epoch17-valid_loss1.02_cp.ckpt",
+            "exp-005-effb0/exp-005-fold=4-epoch=7-val_loss=0.00.ckpt",
+            "exp-005-effb0/exp-005-fold=3-epoch=8-val_loss=0.00.ckpt",
+            "exp-005-effb0/exp-005-fold=2-epoch=8-val_loss=0.00.ckpt",
+            "exp-005-effb0/exp-005-fold=1-epoch=6-val_loss=0.00.ckpt",
+            "exp-005-effb0/exp-005-fold=0-epoch=5-val_loss=0.00.ckpt",
         ],
     }
 
@@ -71,6 +75,7 @@ def create_datamodule(config: Any) -> ShopeeDataModule:
 
 # %%
 def create_system(config: Any, checkpoint_filename: str) -> pl.LightningModule:
+    tag = Path(checkpoint_filename).stem
     backbone = timm.create_model(
         config.backbone, pretrained=True, num_classes=0, global_pool=""
     )
@@ -87,7 +92,7 @@ def create_system(config: Any, checkpoint_filename: str) -> pl.LightningModule:
         str(get_model_path(checkpoint_filename)),
         backbone=backbone,
         metric=metric,
-        submission_filename=f"submission_{checkpoint_filename}.csv",
+        submission_filename=f"submission_{tag}.csv",
     )
     shopee_net.to(get_device())
 

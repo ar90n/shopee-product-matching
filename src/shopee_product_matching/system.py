@@ -48,6 +48,15 @@ class ImageMetricLearning(pl.LightningModule):
         x = self.head(x)
         return x
 
+    def forward_with_tta(self, x):
+        dims = x.shape
+        x = x.reshape([-1, *dims[-3:]])
+        y = self(x)
+        y = y.reshape([*dims[:-3], -1])
+        if len(dims) == 5:
+            y = torch.mean(y, axis=1)
+        return y
+
     def training_step(self, batch, batch_idx):
         x = batch[ShopeeProp.image]
         y = batch[ShopeeProp.label_group]
@@ -69,21 +78,13 @@ class ImageMetricLearning(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         output = self.test_step(batch, batch_idx)
-
-        x = output["embeddings"]
-        x = x.to(self.device)
         y = batch[ShopeeProp.label_group]
         y = y.to(self.device)
-        y_hat = self.metric(x, y)
-        loss = self.loss(y_hat, y)
-        self.log(
-            "valid_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True
-        )
         return {**output, "label_group": y}
 
     def validation_epoch_end(self, outputs: List[Dict[str, List[Any]]]) -> None:
+        acc_outputs = _accumulate_outputs(outputs)
         try:
-            acc_outputs = _accumulate_outputs(outputs)
             infer_matches = find_matches(
                 acc_outputs["posting_ids"], acc_outputs["embeddings"]
             )
@@ -91,10 +92,16 @@ class ImageMetricLearning(pl.LightningModule):
             expect_matches = _get_expect_matches(
                 acc_outputs["posting_ids"], acc_outputs["label_groups"]
             )
-
             valid_f1 = f1_score(infer_matches, expect_matches)
         except ValueError:
             valid_f1 = float("nan")
+
+        try:
+            inter_intra_class_loss = _calc_inter_intra_class_loss(
+                acc_outputs["label_groups"], acc_outputs["embeddings"]
+            )
+        except ValueError:
+            inter_intra_class_loss = float("nan")
 
         self.log(
             "valid_f1",
@@ -105,11 +112,21 @@ class ImageMetricLearning(pl.LightningModule):
             logger=True,
         )
 
+        self.log(
+            "valid_loss",
+            inter_intra_class_loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+        )
+
     def test_step(self, batch, batch_idx) -> Dict[str, Any]:
+        posting_id = batch[ShopeeProp.posting_id]
         x = batch[ShopeeProp.image]
         x.to(self.device)
-        posting_id = batch[ShopeeProp.posting_id]
-        return {"posting_id": posting_id, "embeddings": self(x)}
+        y = self.forward_with_tta(x)
+        return {"posting_id": posting_id, "embeddings": y}
 
     def test_epoch_end(self, outputs: Dict[str, List[Any]]) -> None:
         acc_outputs = _accumulate_outputs(outputs)
@@ -169,15 +186,8 @@ class TitleMetricLearning(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         output = self.test_step(batch, batch_idx)
 
-        x = output["embeddings"]
-        x = x.to(self.device)
         y = batch[ShopeeProp.label_group]
         y = y.to(self.device)
-        y_hat = self.metric(x, y)
-        loss = self.loss(y_hat, y)
-        self.log(
-            "valid_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True
-        )
         return {**output, "label_group": y}
 
     def validation_epoch_end(self, outputs: List[Dict[str, List[Any]]]) -> None:
@@ -238,6 +248,23 @@ def _accumulate_outputs(outputs: List[Dict[str, List[Any]]]) -> Dict[str, Any]:
         "posting_ids": sum(posting_ids, []),
         "label_groups": np.concatenate(label_groups),
     }
+
+
+def _calc_inter_intra_class_loss(
+    label_groups: np.ndarray, embeddings: np.ndarray
+) -> float:
+    classes = sorted(np.unique(label_groups))
+
+    centres = []
+    for c in classes:
+        centres.append(np.average(embeddings[label_groups == c], axis=0))
+
+    intra_class_losses = []
+    for c, centre in zip(classes, centres):
+        diff = embeddings[label_groups == c] - centre
+        intra_class_losses.append(np.std(diff))
+
+    return sum(intra_class_losses) / len(classes)
 
 
 def _get_expect_matches(

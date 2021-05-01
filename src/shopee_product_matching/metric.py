@@ -1,5 +1,5 @@
 import math
-from typing import Any, List
+from typing import Any, List, Dict
 
 import torch
 import torch.nn as nn
@@ -21,8 +21,10 @@ def create_metric(
 
 
 class AdaCos(nn.Module):
-    def __init__(self, num_features, num_classes, m=0.50) -> None:
-        super(AdaCos, self).__init__()
+    def __init__(
+        self, num_features, num_classes, m: float = 0.50, **kwargs: Dict[str, Any]
+    ) -> None:
+        super().__init__()
         self.num_features = num_features
         self.n_classes = num_classes
         self.s = math.sqrt(2) * math.log(num_classes - 1)
@@ -41,16 +43,13 @@ class AdaCos(nn.Module):
             return logits
         # feature re-scale
         theta = torch.acos(torch.clamp(logits, -1.0 + 1e-7, 1.0 - 1e-7))
-        one_hot = torch.zeros_like(logits)
+        one_hot = torch.zeros_like(logits, device="cuda")
         one_hot.scatter_(1, label.view(-1, 1).long(), 1)
 
         if self.training:
             with torch.no_grad():
-                B_avg = torch.where(
-                    one_hot < 1, torch.exp(self.s * logits), torch.zeros_like(logits)
-                )
+                B_avg = (1.0 - one_hot) * torch.exp(self.s * logits)
                 B_avg = torch.sum(B_avg) / input.size(0)
-                # print(B_avg)
                 theta_med = torch.median(theta[one_hot == 1])
                 self.s = torch.log(B_avg) / torch.cos(
                     torch.min(math.pi / 4 * torch.ones_like(theta_med), theta_med)
@@ -70,6 +69,7 @@ class ArcMarginProduct(nn.Module):
         m: float = 0.50,
         easy_margin: bool = False,
         ls_eps: float = 0.0,
+        **kwargs: Dict[str, Any],
     ):
         super(ArcMarginProduct, self).__init__()
         self.in_features = num_features

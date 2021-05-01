@@ -1,5 +1,8 @@
+import os
 from pathlib import Path
-from typing import Iterable, List, Union
+from typing import Iterable, List, Union, Optional
+from tempfile import TemporaryDirectory
+import subprocess
 
 import cudf
 import numpy as np
@@ -7,8 +10,41 @@ import pandas as pd
 from cuml.feature_extraction.text import TfidfVectorizer
 from cuml.neighbors import NearestNeighbors
 from joblib import dump, load
-from sklearn import preprocessing
 from sklearn.decomposition import PCA
+from torch.nn.functional import embedding
+
+
+class LaserEmbedding:
+    def __init__(self, lang: str, laser_dir: Optional[Path] = None) -> None:
+        self._lang = lang
+        self._laser_dir = laser_dir
+
+    def transform(self, texts: Iterable[str]) -> np.ndarray:
+        laser_dir = (
+            self._laser_dir if self._laser_dir is not None else os.environ.get("LASER")
+        )
+        if laser_dir is None:
+            raise EnvironmentError("Path to LASER directory is not given")
+
+        embed_sh_path = Path(laser_dir) / "tasks" / "embed" / "embed.sh"
+        with TemporaryDirectory() as temp:
+            input_path = Path(temp) / "input.txt"
+            output_path = Path(temp) / "output.raw"
+            input_path.write_text("\n".join(texts))
+
+            subprocess.check_call(
+                args=[
+                    "bash",
+                    str(embed_sh_path),
+                    str(input_path),
+                    self._lang,
+                    str(output_path),
+                ],
+                env={**os.environ, "LASER": laser_dir},
+            )
+            X = np.fromfile(str(output_path), dtype=np.float32, count=-1)
+            X.resize(X.shape[0] // 1024, 1024)
+        return X
 
 
 class TfIdfEmbedding:
@@ -20,7 +56,7 @@ class TfIdfEmbedding:
 
     def fit_transform(self, texts: Iterable[str]) -> np.ndarray:
         embeddings = self.model.fit_transform(cudf.Series(texts)).toarray().get()
-        if self.pca.n_components < self.model.max_features:
+        if self.pca.n_components < min(len(embeddings), self.model.max_features):
             return self.pca.fit_transform(embeddings)
         else:
             return embeddings

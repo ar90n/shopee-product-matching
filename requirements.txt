@@ -1,2 +1,2 @@
 timm==0.4.5
-kaggle_timm_pretrained==0.3.1
+kaggle_timm_pretrained==0.3.1transliterate

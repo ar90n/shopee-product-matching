@@ -1,9 +1,6 @@
-name: effb3-cv
+name: effb0-cv
 method: grid
 parameters:
-  backbone:
-    values:
-      - efficientnet_b3
   fold:
     values:
       - 0
