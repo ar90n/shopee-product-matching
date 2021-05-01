@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Iterable
 
 import pandas as pd
 import torch
@@ -48,3 +48,12 @@ def read_resize_normalize(config: Any, data_type: str) -> Callable[[Any], Any]:
             Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
     )
+
+
+def map_stack(
+    funcs: Iterable[Callable[[Any], torch.Tensor]]
+) -> Callable[[Any], torch.Tensor]:
+    def _f(input: Any) -> torch.Tensor:
+        return torch.stack([f(input) for f in funcs])
+
+    return _f
