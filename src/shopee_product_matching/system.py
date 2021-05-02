@@ -12,6 +12,7 @@ from .datamodule import ShopeeProp
 from .feature import find_matches
 from .metric import f1_score
 from .scheduler import ADSRScheduler
+from .neighbor import KnnMatch
 from .util import save_submission_csv, get_matches
 
 
@@ -28,6 +29,7 @@ class ImageMetricLearning(pl.LightningModule):
         head=nn.Identity(),
         metric=nn.Identity(),
         loss=nn.CrossEntropyLoss(),
+        match=KnnMatch(),
         submission_filename=None,
     ) -> None:
         super().__init__()
@@ -39,6 +41,7 @@ class ImageMetricLearning(pl.LightningModule):
         self.head = head
         self.metric = metric
         self.loss = loss
+        self.match = match
         self.submission_filename = submission_filename
 
     def forward(self, x):
@@ -85,9 +88,11 @@ class ImageMetricLearning(pl.LightningModule):
     def validation_epoch_end(self, outputs: List[Dict[str, List[Any]]]) -> None:
         acc_outputs = _accumulate_outputs(outputs)
         try:
-            infer_matches = find_matches(
-                acc_outputs["posting_ids"], acc_outputs["embeddings"]
-            )
+            index_matches = self.match(acc_outputs["embeddings"])
+            infer_matches = [
+                [acc_outputs["posting_ids"][i] for i in match]
+                for match in index_matches
+            ]
 
             expect_matches = get_matches(
                 acc_outputs["posting_ids"], acc_outputs["label_groups"]
@@ -130,7 +135,10 @@ class ImageMetricLearning(pl.LightningModule):
 
     def test_epoch_end(self, outputs: Dict[str, List[Any]]) -> None:
         acc_outputs = _accumulate_outputs(outputs)
-        matches = find_matches(acc_outputs["posting_ids"], acc_outputs["embeddings"])
+        index_matches = self.match(acc_outputs["embeddings"])
+        matches = [
+            [acc_outputs["posting_ids"][i] for i in match] for match in index_matches
+        ]
 
         save_submission_csv(
             acc_outputs["posting_ids"], matches, self.submission_filename
@@ -149,6 +157,7 @@ class TitleMetricLearning(pl.LightningModule):
         head,
         metric=nn.Identity(),
         loss=nn.CrossEntropyLoss(),
+        match=KnnMatch(threshold=0.6),
         submission_filename=None,
     ) -> None:
         super().__init__()
@@ -158,6 +167,7 @@ class TitleMetricLearning(pl.LightningModule):
         self.head = head
         self.metric = metric
         self.loss = loss
+        self.match = match
         self.submission_filename = submission_filename
 
     def forward(self, x):
