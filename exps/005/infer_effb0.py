@@ -48,7 +48,7 @@ if is_kaggle():
 # %%
 def get_config_defaults() -> Dict[str, Any]:
     return {
-        "test_batch_size": 64,
+        "test_batch_size": 16,
         "num_workers": 4,
         "image_size": 512,
         "backbone": "efficientnet_b0",

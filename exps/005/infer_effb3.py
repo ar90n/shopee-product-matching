@@ -16,7 +16,7 @@
 
 # %%
 from pathlib import Path
-from typing import Dict, Any, Tuple
+from typing import Dict, Any
 
 import pytorch_lightning as pl
 import timm
@@ -48,17 +48,17 @@ if is_kaggle():
 # %%
 def get_config_defaults() -> Dict[str, Any]:
     return {
-        "test_batch_size": 64,
+        "test_batch_size": 16,
         "num_workers": 4,
         "image_size": 512,
         "backbone": "efficientnet_b3",
         "metric": "arcface",
         "checkpoint_filenames": [
-            "exp-005-effb3/exp-005-fold=1-epoch=7-val_loss=0.00.ckpt",
-            "exp-005-effb3/exp-005-fold=4-epoch=4-val_loss=0.00.ckpt",
-            "exp-005-effb3/exp-005-fold=2-epoch=7-val_loss=0.00.ckpt",
-            "exp-005-effb3/exp-005-fold=3-epoch=7-val_loss=0.00.ckpt",
-            "exp-005-effb3/exp-005-fold=0-epoch=7-val_loss=0.00.ckpt",
+            "exp-005-effb3/exp-005-fold0-epoch7-val_loss0.00.ckpt",
+            "exp-005-effb3/exp-005-fold1-epoch7-val_loss0.00.ckpt",
+            "exp-005-effb3/exp-005-fold2-epoch7-val_loss0.00.ckpt",
+            # "exp-005-effb3/exp-005-fold3-epoch7-val_loss0.00.ckpt",
+            # "exp-005-effb3/exp-005-fold4-epoch4-val_loss0.00.ckpt",
         ],
     }
 

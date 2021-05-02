@@ -52,7 +52,6 @@ from torchvision.transforms import (
 from shopee_product_matching.transform import imread, identity, map_stack
 
 
-
 # %%
 if is_kaggle():
     import kaggle_timm_pretrained
@@ -62,22 +61,23 @@ if is_kaggle():
 # %%
 def get_config_defaults() -> Dict[str, Any]:
     return {
-        "test_batch_size": 64,
+        "test_batch_size": 16,
         "num_workers": 4,
         "image_size": 512,
-        "backbone": "efficientnet_b3",
+        "backbone": "efficientnet_b0",
         "metric": "arcface",
         "checkpoint_filenames": [
-            "exp-005-effb3/exp-005-fold=1-epoch=7-val_loss=0.00.ckpt",
-            "exp-005-effb3/exp-005-fold=4-epoch=4-val_loss=0.00.ckpt",
-            "exp-005-effb3/exp-005-fold=2-epoch=7-val_loss=0.00.ckpt",
-            "exp-005-effb3/exp-005-fold=3-epoch=7-val_loss=0.00.ckpt",
-            "exp-005-effb3/exp-005-fold=0-epoch=7-val_loss=0.00.ckpt",
+            "exp-005-effb0/exp-005-fold4-epoch7-val_loss0.00.ckpt",
+            "exp-005-effb0/exp-005-fold3-epoch8-val_loss0.00.ckpt",
+            "exp-005-effb0/exp-005-fold2-epoch8-val_loss0.00.ckpt",
+            "exp-005-effb0/exp-005-fold1-epoch6-val_loss0.00.ckpt",
+            "exp-005-effb0/exp-005-fold0-epoch5-val_loss0.00.ckpt",
         ],
     }
 
 
 # %%
+
 
 def create_datamodule(config: Any) -> ShopeeDataModule:
     image_transform = Compose(
@@ -102,13 +102,11 @@ def create_datamodule(config: Any) -> ShopeeDataModule:
                             image_transform,
                             image_transform,
                             image_transform,
-                            image_transform,
-                            image_transform,
                         ]
                     ),
                 ]
             ),
-            posting_id=identity
+            posting_id=identity,
         )
     )
     return ShopeeDataModule(config, queries)
@@ -124,10 +122,6 @@ def create_system(config: Any, checkpoint_filename: str) -> pl.LightningModule:
         config.metric,
         num_features=backbone.num_features,
         num_classes=constants.TrainData.label_group_unique_unique_count,
-        s=30.0,
-        m=0.50,
-        easy_margin=False,
-        ls_eps=0.0,
     )
     shopee_net = ImageMetricLearning.load_from_checkpoint(
         str(get_model_path(checkpoint_filename)),

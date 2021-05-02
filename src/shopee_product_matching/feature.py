@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Iterable, List, Union, Optional
 from tempfile import TemporaryDirectory
 import subprocess
+import shutil
 
 import cudf
 import numpy as np
@@ -11,39 +12,57 @@ from cuml.feature_extraction.text import TfidfVectorizer
 from cuml.neighbors import NearestNeighbors
 from joblib import dump, load
 from sklearn.decomposition import PCA
-from torch.nn.functional import embedding
 
 
 class LaserEmbedding:
-    def __init__(self, lang: str, laser_dir: Optional[Path] = None) -> None:
+    def __init__(self, lang: str, laser_dir: Optional[Path] = None, chunk_size: int = 4096) -> None:
         self._lang = lang
         self._laser_dir = laser_dir
+        self._chunk_size = chunk_size
 
-    def transform(self, texts: Iterable[str]) -> np.ndarray:
+    def _copy_laser_dir(self, dst:str) -> None:
         laser_dir = (
             self._laser_dir if self._laser_dir is not None else os.environ.get("LASER")
         )
         if laser_dir is None:
             raise EnvironmentError("Path to LASER directory is not given")
 
-        embed_sh_path = Path(laser_dir) / "tasks" / "embed" / "embed.sh"
+        shutil.copytree(str(laser_dir), f"{dst}/LASER")
+        os.chmod(f"{dst}/LASER/tools-external/fastBPE/fast", 0o755)
+        os.chmod(f"{dst}/LASER/tools-external/fastBPE/fast", 0o755)
+        for p in Path(f"{dst}/LASER/tools-external/moses-tokenizer/tokenizer").glob(
+            "*"
+        ):
+            os.chmod(str(p), 0o755)
+
+    def transform(self, texts: Iterable[str]) -> np.ndarray:
+        from more_itertools import chunked
+
         with TemporaryDirectory() as temp:
+            self._copy_laser_dir(temp)
+            laser_dir = Path(temp) / "LASER"
+            embed_sh_path = laser_dir / "tasks" / "embed" / "embed.sh"
+
+            results = []
             input_path = Path(temp) / "input.txt"
             output_path = Path(temp) / "output.raw"
-            input_path.write_text("\n".join(texts))
-
-            subprocess.check_call(
-                args=[
-                    "bash",
-                    str(embed_sh_path),
-                    str(input_path),
-                    self._lang,
-                    str(output_path),
-                ],
-                env={**os.environ, "LASER": laser_dir},
-            )
-            X = np.fromfile(str(output_path), dtype=np.float32, count=-1)
-            X.resize(X.shape[0] // 1024, 1024)
+            for chunk in chunked(texts, self._chunk_size):
+                input_path.write_text("\n".join(chunk))
+                subprocess.check_call(
+                    args=[
+                        "bash",
+                        str(embed_sh_path),
+                        str(input_path),
+                        self._lang,
+                        str(output_path),
+                    ],
+                    env={**os.environ, "LASER": str(laser_dir)},
+                )
+                X = np.fromfile(str(output_path), dtype=np.float32, count=-1)
+                X.resize(X.shape[0] // 1024, 1024)
+                output_path.unlink()
+                results.append(X)
+        X = np.vstack(results)
         return X
 
 

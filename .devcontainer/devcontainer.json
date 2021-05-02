@@ -20,7 +20,7 @@
 		"/data/cache:/cache",
 		"-v",
 		"/mnt/data/kaggle/input:/workspaces/input",
-		"--shm-size=1024m"
+		"--shm-size=4096M"
 	],
 
 	// Set *default* container specific settings.json values on container create.
