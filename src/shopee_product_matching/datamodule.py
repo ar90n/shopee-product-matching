@@ -67,15 +67,15 @@ class ShopeeDataset(Dataset[ShopeeRecord]):
         return cast(ShopeeRecord, record)
 
 
+DatasetTransform = Callable[[pd.DataFrame], pd.DataFrame]
+DatasetSplit = Callable[[pd.DataFrame, Any], Tuple[pd.DataFrame, pd.DataFrame]]
+
+
 @dataclass
 class ShopeeDataModuleQueries:
     train: Optional[ShopeeQuery] = None
     valid: Optional[ShopeeQuery] = None
     test: Optional[ShopeeQuery] = None
-
-
-DatasetTransform = Callable[[pd.DataFrame], pd.DataFrame]
-DatasetSplit = Callable[[pd.DataFrame, Any], Tuple[pd.DataFrame, pd.DataFrame]]
 
 
 @dataclass
@@ -85,10 +85,14 @@ class ShopeeDataModuleTransforms:
     test: Optional[DatasetTransform] = None
 
 
+def _use_all_train_data(df: pd.DataFrame, _: Any) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    return (df, df)
+
+
 class ShopeeDataModule(pl.LightningDataModule):
     _config: Any
     _queries: ShopeeDataModuleQueries
-    _train_valid_split: Optional[DatasetSplit]
+    _train_valid_split: DatasetSplit
     _transforms: ShopeeDataModuleTransforms
     _train_dataset: Optional[ShopeeDataset] = None
     _valid_dataset: Optional[ShopeeDataset] = None
@@ -98,7 +102,7 @@ class ShopeeDataModule(pl.LightningDataModule):
         self,
         config: Any,
         queries: ShopeeDataModuleQueries,
-        train_valid_split: Optional[DatasetSplit] = None,
+        train_valid_split: DatasetSplit = _use_all_train_data,
         transforms: ShopeeDataModuleTransforms = ShopeeDataModuleTransforms(),
     ):
         super().__init__()
@@ -116,11 +120,7 @@ class ShopeeDataModule(pl.LightningDataModule):
             pd.DataFrame,
             pd.read_csv(Paths.shopee_product_matching / "train.csv", index_col=0),
         )
-        if self._train_valid_split is not None:
-            train_df, valid_df = self._train_valid_split(train_full_df, self._config)
-        else:
-            train_df = train_full_df
-            valid_df = train_full_df
+        train_df, valid_df = self._train_valid_split(train_full_df, self._config)
         self._train_dataset = self._setup_dataset(
             train_df,
             self._queries.train,
@@ -132,7 +132,12 @@ class ShopeeDataModule(pl.LightningDataModule):
             self._transforms.valid,
         )
 
-        test_df = pd.read_csv(Paths.shopee_product_matching / "test.csv", index_col=0)
+        if self._config.get("is_cv", False):
+            test_df = valid_df
+        else:
+            test_df = pd.read_csv(
+                Paths.shopee_product_matching / "test.csv", index_col=0
+            )
         self._test_dataset = self._setup_dataset(
             test_df,
             self._queries.test,

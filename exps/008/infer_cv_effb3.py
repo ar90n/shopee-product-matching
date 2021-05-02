@@ -18,6 +18,7 @@
 from pathlib import Path
 from typing import Dict, Any, Tuple
 
+import pandas as pd
 import pytorch_lightning as pl
 import timm
 from shopee_product_matching.transform import read_resize_normalize, identity
@@ -48,29 +49,37 @@ if is_kaggle():
 # %%
 def get_config_defaults() -> Dict[str, Any]:
     return {
+        "is_cv": True,
         "test_batch_size": 16,
         "num_workers": 4,
         "image_size": 512,
-        "backbone": "efficientnet_b0",
+        "backbone": "efficientnet_b3",
         "metric": "arcface",
         "checkpoint_filenames": [
-            "exp-005-effb0/exp-005-fold4-epoch7-val_loss0.00.ckpt",
-            "exp-005-effb0/exp-005-fold3-epoch8-val_loss0.00.ckpt",
-            "exp-005-effb0/exp-005-fold2-epoch8-val_loss0.00.ckpt",
-            "exp-005-effb0/exp-005-fold1-epoch6-val_loss0.00.ckpt",
-            "exp-005-effb0/exp-005-fold0-epoch5-val_loss0.00.ckpt",
+            "exp-005-effb3/exp-005-fold0-epoch7-val_loss0.00.ckpt",
+            "exp-005-effb3/exp-005-fold1-epoch7-val_loss0.00.ckpt",
+            "exp-005-effb3/exp-005-fold2-epoch7-val_loss0.00.ckpt",
+            "exp-005-effb3/exp-005-fold3-epoch7-val_loss0.00.ckpt",
+            "exp-005-effb3/exp-005-fold4-epoch4-val_loss0.00.ckpt",
         ],
     }
 
 
 # %%
-def create_datamodule(config: Any) -> ShopeeDataModule:
+def create_datamodule(config: Any, fold: int) -> ShopeeDataModule:
     queries = ShopeeDataModuleQueries(
-        test=ShopeeQuery(
-            image=read_resize_normalize(config, "test_images"), posting_id=identity
-        ),
+        test=ShopeeQuery(image=read_resize_normalize(config), posting_id=identity),
     )
-    return ShopeeDataModule(config, queries)
+
+    def test_valid_split(df: pd.DataFrame, _: Any) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        from shopee_product_matching.constants import Paths
+
+        fold_df = pd.read_csv(Paths.requirements / "fold.csv", index_col=0)
+        train_df = df[fold_df["fold"] != fold]
+        valid_df = df[fold_df["fold"] == fold]
+        return train_df, valid_df
+
+    return ShopeeDataModule(config, queries, test_valid_split)
 
 
 # %%
@@ -109,11 +118,11 @@ def create_trainer(config: Any) -> ShopeeTrainer:
 def infer() -> None:
     config_defaults = get_config_defaults()
     with context(config_defaults, JobType.Inferene) as config:
-        dm = create_datamodule(config)
         trainer = create_trainer(config)
 
         with ensemble():
-            for checkpoint_filename in config.checkpoint_filenames:
+            for i, checkpoint_filename in enumerate(config.checkpoint_filenames):
+                dm = create_datamodule(config, i)
                 system = create_system(config, checkpoint_filename)
                 trainer.test(system, datamodule=dm)
 

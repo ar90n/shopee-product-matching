@@ -14,6 +14,7 @@ import torch
 from albumentations import Compose
 from typing_extensions import final
 from shopee_product_matching.constants import Paths, seed
+from shopee_product_matching.metric import f1_score
 
 try:
     import torch_xla
@@ -167,6 +168,20 @@ def context(
         if mode == "online":
             wandb.finish()
 
+    if wandb.config.get("is_cv", False):
+        submission = pd.read_csv("submission.csv", index_col=0)
+        submission_matches = submission["matches"].map(lambda x: x.split(" "))
+        exp_df = pd.read_csv(
+            Paths.shopee_product_matching / "train.csv", index_col=0
+        ).loc[submission.index]
+        exp_matches = get_matches(
+            exp_df.index,
+            exp_df["label_group"],
+        )
+
+        f1 = f1_score(submission_matches, exp_matches)
+        print(f"f1:{f1}")
+
 
 @contextmanager
 def ensemble(filename="submission.csv") -> None:
@@ -255,3 +270,17 @@ def get_model_path(model_name: str) -> Path:
     if is_kaggle():
         model_name = "".join(c for c in model_name if c != "=")
     return Paths.requirements / model_name
+
+
+def get_matches(posting_ids: List[str], label_groups: List[str]) -> List[List[str]]:
+    df = pd.DataFrame(
+        {
+            "label_group": label_groups,
+            "posting_id": posting_ids,
+        }
+    )
+    return (
+        df["label_group"]
+        .map(df.groupby(["label_group"])["posting_id"].unique().to_dict())
+        .values.tolist()
+    )

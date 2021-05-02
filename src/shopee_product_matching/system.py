@@ -12,7 +12,7 @@ from .datamodule import ShopeeProp
 from .feature import find_matches
 from .metric import f1_score
 from .scheduler import ADSRScheduler
-from .util import save_submission_csv
+from .util import save_submission_csv, get_matches
 
 
 class ImageMetricLearning(pl.LightningModule):
@@ -89,7 +89,7 @@ class ImageMetricLearning(pl.LightningModule):
                 acc_outputs["posting_ids"], acc_outputs["embeddings"]
             )
 
-            expect_matches = _get_expect_matches(
+            expect_matches = get_matches(
                 acc_outputs["posting_ids"], acc_outputs["label_groups"]
             )
             valid_f1 = f1_score(infer_matches, expect_matches)
@@ -197,7 +197,7 @@ class TitleMetricLearning(pl.LightningModule):
                 acc_outputs["posting_ids"], acc_outputs["embeddings"], 0.6
             )
 
-            expect_matches = _get_expect_matches(
+            expect_matches = get_matches(
                 acc_outputs["posting_ids"], acc_outputs["label_groups"]
             )
 
@@ -265,19 +265,3 @@ def _calc_inter_intra_class_loss(
         intra_class_losses.append(np.std(diff))
 
     return sum(intra_class_losses) / len(classes)
-
-
-def _get_expect_matches(
-    posting_ids: List[str], label_groups: List[str]
-) -> List[List[str]]:
-    df = pd.DataFrame(
-        {
-            "label_group": label_groups,
-            "posting_id": posting_ids,
-        }
-    )
-    return (
-        df["label_group"]
-        .map(df.groupby(["label_group"])["posting_id"].unique().to_dict())
-        .values.tolist()
-    )
