@@ -132,8 +132,7 @@ class ShopeeDataModule(pl.LightningDataModule):
             self._transforms.valid,
         )
 
-        #test_df = pd.read_csv(Paths.shopee_product_matching / "test.csv", index_col=0)
-        test_df = pd.read_csv(Paths.shopee_product_matching / "train.csv", index_col=0)
+        test_df = pd.read_csv(Paths.shopee_product_matching / "test.csv", index_col=0)
         self._test_dataset = self._setup_dataset(
             test_df,
             self._queries.test,
