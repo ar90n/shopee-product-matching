@@ -9,11 +9,8 @@ import cudf
 import numpy as np
 import pandas as pd
 from cuml.feature_extraction.text import TfidfVectorizer
-from cuml.neighbors import NearestNeighbors
 from joblib import dump, load
 
-# from sklearn.decomposition import PCA
-from cuml import PCA
 import fasttext
 
 
@@ -76,83 +73,35 @@ class TfIdfEmbedding:
         self.model = TfidfVectorizer(
             stop_words="english", binary=True, max_features=max_features
         )
-        self.pca = PCA(n_components=n_components)
 
     def fit_transform(self, texts: Iterable[str]) -> np.ndarray:
-        embeddings = self.model.fit_transform(cudf.Series(texts)).toarray()
-        return embeddings
-        # if self.pca.n_components < min(len(embeddings), self.model.max_features):
-        #    return self.pca.fit_transform(embeddings).get()
-        # else:
-        #    return embeddings.get()
+        return self.model.fit_transform(cudf.Series(texts)).toarray()
 
     def fit(self, texts: Union[List[str], pd.Series]) -> None:
-        if self.pca.n_components < min(len(texts), self.model.max_features):
-            _embeddings = self.model.fit_transform(cudf.Series(texts)).toarray()
-            self.pca.fit(_embeddings)
-        else:
-            self.model.fit(cudf.Series(texts))
+        self.model.fit(cudf.Series(texts))
 
     def save(self, path: Union[str, Path]) -> Path:
         path = Path(path)
-        model_filename = f"{path.stem}-max_feature={self.model.max_features}-n_component={self.pca.n_components}{path.suffix}"
+        model_filename = (
+            f"{path.stem}-max_feature={self.model.max_features}{path.suffix}"
+        )
         path = path.parent / model_filename
-        dump({"model": self.model, "pca": self.pca}, str(path))
+        dump({"model": self.model}, str(path))
         return path
 
     @property
     def num_features(self) -> int:
-        return min(self.model.max_features, self.pca.n_components)
+        return self.model.max_features
 
     @classmethod
     def load(cls, path: Union[str, Path]) -> "TfIdfEmbedding":
         models = load(str(path))
         other = super().__new__(cls)
         other.model = models["model"]
-        other.pca = models["pca"]
         return other
 
     def __call__(self, texts: Union[List[str], pd.Series]) -> np.ndarray:
-        embeddings = self.model.transform(cudf.Series(texts)).toarray().get()
-        if self.pca.n_components < self.model.max_features:
-            return self.pca.transform(embeddings)
-        else:
-            return embeddings
-
-
-def find_matches(
-    posting_ids: List[str], embeddings: np.ndarray, threshold: float = 2.7
-) -> List[List[str]]:
-    print("Finding similar titles...")
-    CHUNK = 1024 * 4
-    CTS = len(posting_ids) // CHUNK
-    if (len(posting_ids) % CHUNK) != 0:
-        CTS += 1
-
-    import cupy
-
-    preds = []
-    for j in range(CTS):
-        a = j * CHUNK
-        b = (j + 1) * CHUNK
-        b = min(b, len(posting_ids))
-        print("chunk", a, "to", b)
-
-        # COSINE SIMILARITY DISTANCE
-        cts = cupy.matmul(embeddings, embeddings[a:b].T).T
-        for k in range(b - a):
-            IDX = cupy.where(
-                cts[
-                    k,
-                ]
-                > 0.75
-            )[0]
-            o = [posting_ids[i] for i in cupy.asnumpy(IDX)]
-            if posting_ids[k + a] not in o:
-                o.append(posting_ids[k + a])
-            preds.append(o)
-
-    return preds
+        return self.model.transform(cudf.Series(texts)).toarray()
 
 
 class FastTextEmbedding:
@@ -233,3 +182,17 @@ class FastTextEmbedding:
             return weights.get() @ np.vstack(embeddings)
 
         return _f
+
+
+from shopee_product_matching.neighbor import CosineSimilarityMatch
+
+
+def find_matches(
+    posting_ids: List[str], embeddings: np.ndarray, threshold: float = 2.7
+) -> List[List[str]]:
+    match_ids = CosineSimilarityMatch(threshold=threshold)(embeddings)
+
+    matches: List[List[str]] = []
+    for ids in match_ids:
+        matches.append([posting_ids[i] for i in ids])
+    return matches

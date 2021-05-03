@@ -2,14 +2,11 @@ from dataclasses import asdict, dataclass
 from typing import Any, Dict, List
 
 import numpy as np
-import pandas as pd
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.core.lightning import LightningModule
 from torch import nn
 
 from .datamodule import ShopeeProp
-from .feature import find_matches
 from .metric import f1_score
 from .scheduler import ADSRScheduler
 from .neighbor import CosineSimilarityMatch, KnnMatch
@@ -146,101 +143,6 @@ class ImageMetricLearning(pl.LightningModule):
         matches = [
             [acc_outputs["posting_ids"][i] for i in match] for match in index_matches
         ]
-
-        save_submission_csv(
-            acc_outputs["posting_ids"], matches, self.submission_filename
-        )
-
-
-class TitleMetricLearning(pl.LightningModule):
-    @dataclass
-    class Param:
-        start_lr: float = 1e-5
-        max_lr: float = 1e-4
-
-    def __init__(
-        self,
-        param,
-        head,
-        metric=nn.Identity(),
-        loss=nn.CrossEntropyLoss(),
-        match=KnnMatch(threshold=0.6),
-        submission_filename=None,
-    ) -> None:
-        super().__init__()
-        self.scheduler_params = {}
-
-        self.param = param
-        self.head = head
-        self.metric = metric
-        self.loss = loss
-        self.match = match
-        self.submission_filename = submission_filename
-
-    def forward(self, x):
-        x = self.head(x)
-        return x
-
-    def training_step(self, batch, batch_idx):
-        x = batch[ShopeeProp.title]
-        x = x.to(self.device)
-        y = batch[ShopeeProp.label_group]
-        y = y.to(self.device)
-
-        feature = self(x)
-        y_hat = self.metric(feature, y)
-        loss = self.loss(y_hat, y)
-        self.log(
-            "train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True
-        )
-        return loss
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.param.start_lr)
-        scheduler = ADSRScheduler(optimizer, **asdict(self.param))
-        return [optimizer], [scheduler]
-
-    def validation_step(self, batch, batch_idx):
-        output = self.test_step(batch, batch_idx)
-
-        y = batch[ShopeeProp.label_group]
-        y = y.to(self.device)
-        return {**output, "label_group": y}
-
-    def validation_epoch_end(self, outputs: List[Dict[str, List[Any]]]) -> None:
-        try:
-            acc_outputs = _accumulate_outputs(outputs)
-            infer_matches = find_matches(
-                acc_outputs["posting_ids"], acc_outputs["embeddings"], 0.6
-            )
-
-            expect_matches = get_matches(
-                acc_outputs["posting_ids"], acc_outputs["label_groups"]
-            )
-
-            valid_f1 = f1_score(infer_matches, expect_matches)
-        except ValueError:
-            valid_f1 = float("nan")
-
-        self.log(
-            "valid_f1",
-            valid_f1,
-            on_step=False,
-            on_epoch=True,
-            prog_bar=True,
-            logger=True,
-        )
-
-    def test_step(self, batch, batch_idx) -> Dict[str, Any]:
-        embeddings = self(batch[ShopeeProp.title])
-        posting_id = batch[ShopeeProp.posting_id]
-        return {"posting_id": posting_id, "embeddings": embeddings}
-
-    def test_epoch_end(self, outputs: Dict[str, List[Any]]) -> None:
-        acc_outputs = _accumulate_outputs(outputs)
-        matches = find_matches(
-            acc_outputs["posting_ids"], acc_outputs["embeddings"], 0.6
-        )
 
         save_submission_csv(
             acc_outputs["posting_ids"], matches, self.submission_filename

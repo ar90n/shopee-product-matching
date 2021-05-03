@@ -6,6 +6,8 @@ import numpy as np
 import torch
 from cuml.neighbors import NearestNeighbors
 from shopee_product_matching.util import get_device
+from cupy.core.dlpack import toDlpack
+from torch.utils.dlpack import from_dlpack
 
 
 def create_match(
@@ -51,9 +53,13 @@ class CosineSimilarityMatch:
         self._threshold = threshold
         self._chunk = chunk
 
-    def __call__(self, embeddings: Union[np.ndarray, torch.Tensor]) -> List[List[int]]:
+    def __call__(
+        self, embeddings: Union[np.ndarray, cupy.core.core.ndarray, torch.Tensor]
+    ) -> List[List[int]]:
         if isinstance(embeddings, np.ndarray):
             embeddings = torch.from_numpy(embeddings)
+        elif isinstance(embeddings, cupy.core.core.ndarray):
+            embeddings = from_dlpack(toDlpack(embeddings))
         embeddings = embeddings.to(get_device())
         embeddings *= 1.0 / (torch.norm(embeddings, dim=1).reshape(-1, 1) + 1e-12)
 
@@ -68,13 +74,14 @@ class CosineSimilarityMatch:
             b = min(b, len(embeddings))
             distances = 1.0 - torch.matmul(embeddings, embeddings[a:b].T).cpu().T
             for k in range(b - a):
-                ids = (
-                    torch.where(
-                        distances[
-                            k,
-                        ]
-                        < self._threshold
-                    )[0]
-                )
-                matches.append([int(i) for i in ids])
+                ids = torch.where(
+                    distances[
+                        k,
+                    ]
+                    < self._threshold
+                )[0]
+                ids = [int(i) for i in ids]
+                if len(ids) == 0:
+                    ids.append(k + a)
+                matches.append(ids)
         return matches

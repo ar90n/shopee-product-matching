@@ -52,7 +52,7 @@ if is_kaggle():
 # %%
 def get_config_defaults() -> Dict[str, Any]:
     return {
-        "is_cv": False,
+        "is_cv": True,
         "test_batch_size": 16,
         "num_workers": 4,
         "image_size": 512,
@@ -131,7 +131,7 @@ def infer() -> None:
 
         df = dm._test_dataset.df
         with ensemble():
-            test_tfidf.main(df, param={"threshold": 0.6})
+            test_tfidf.main(df, param={"threshold": 0.3})
 
             for model_param in config.model_params:
                 system = create_system(config, model_param)
