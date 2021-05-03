@@ -36,6 +36,12 @@ class _Paths:
 
         return get_input() / "shopeeproductmatchingrequirements"
 
+    @property
+    def requirements2(self) -> Path:
+        from shopee_product_matching.util import get_input
+
+        return get_input() / "shopeeproductmatchingrequirements2"
+
 
 Paths = _Paths()
 TrainData = _TrainData()

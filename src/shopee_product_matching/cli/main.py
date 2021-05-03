@@ -89,7 +89,9 @@ def _push(
     kernel_sources = [] if kernel_source is None else list(kernel_source)
     competition_sources = ["shopee-product-matching"]
     dataset_sources.append("ar90ngas/shopeeproductmatchingrequirements")
+    dataset_sources.append("ar90ngas/shopeeproductmatchingrequirements2")
     dataset_sources.append("ar90ngas/timm-pretrained-efficientnet")
+    dataset_sources.append("ar90ngas/timm-pretrained-nfnet")
 
     return kaggle.push(
         id_no=id_no,

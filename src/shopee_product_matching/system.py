@@ -12,7 +12,7 @@ from .datamodule import ShopeeProp
 from .feature import find_matches
 from .metric import f1_score
 from .scheduler import ADSRScheduler
-from .neighbor import KnnMatch
+from .neighbor import CosineSimilarityMatch, KnnMatch
 from .util import save_submission_csv, get_matches
 
 
@@ -24,12 +24,14 @@ class ImageMetricLearning(pl.LightningModule):
 
     def __init__(
         self,
-        backbone,
         param=Param(),
+        backbone=nn.Identity(),
+        pooling=nn.AdaptiveAvgPool2d(1),
         head=nn.Identity(),
         metric=nn.Identity(),
         loss=nn.CrossEntropyLoss(),
-        match=KnnMatch(),
+        match=CosineSimilarityMatch(0.25),
+        source_prop: ShopeeProp = ShopeeProp.image,
         submission_filename=None,
     ) -> None:
         super().__init__()
@@ -37,11 +39,12 @@ class ImageMetricLearning(pl.LightningModule):
 
         self.param = param
         self.backbone = backbone
-        self.pooling = nn.AdaptiveAvgPool2d(1)
+        self.pooling = pooling
         self.head = head
         self.metric = metric
         self.loss = loss
         self.match = match
+        self.source_prop = source_prop
         self.submission_filename = submission_filename
 
     def forward(self, x):
@@ -61,7 +64,7 @@ class ImageMetricLearning(pl.LightningModule):
         return y
 
     def training_step(self, batch, batch_idx):
-        x = batch[ShopeeProp.image]
+        x = batch[self.source_prop]
         y = batch[ShopeeProp.label_group]
         x = x.to(self.device)
         y = y.to(self.device)
@@ -97,6 +100,7 @@ class ImageMetricLearning(pl.LightningModule):
             expect_matches = get_matches(
                 acc_outputs["posting_ids"], acc_outputs["label_groups"]
             )
+            print(index_matches[:16])
             valid_f1 = f1_score(infer_matches, expect_matches)
         except ValueError:
             valid_f1 = float("nan")
@@ -128,9 +132,12 @@ class ImageMetricLearning(pl.LightningModule):
 
     def test_step(self, batch, batch_idx) -> Dict[str, Any]:
         posting_id = batch[ShopeeProp.posting_id]
-        x = batch[ShopeeProp.image]
+        x = batch[self.source_prop]
         x.to(self.device)
-        y = self.forward_with_tta(x)
+        if self.source_prop == ShopeeProp.image:
+            y = self.forward_with_tta(x)
+        else:
+            y = self(x)
         return {"posting_id": posting_id, "embeddings": y}
 
     def test_epoch_end(self, outputs: Dict[str, List[Any]]) -> None:

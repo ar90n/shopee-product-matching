@@ -8,7 +8,12 @@ from shopee_product_matching.feature import (
     FastTextEmbedding,
 )
 from shopee_product_matching.constants import Paths
-from shopee_product_matching.util import save_submission_csv, ensemble, get_matches
+from shopee_product_matching.util import (
+    save_submission_csv,
+    ensemble,
+    get_matches,
+    get_model_path,
+)
 from shopee_product_matching.metric import f1_score
 
 df = pd.read_csv(Paths.shopee_product_matching / "train.csv")
@@ -35,7 +40,7 @@ with ensemble():
         dim=300,
         epoch=128,
         model="skipgram",
-        pretrained_vectors="../cc.id.300.vec",
+        pretrained_vectors=get_model_path("cc.id.300.vec"),
         agg_func=FastTextEmbedding.create_tfidf_agg_func(tfidf_model),
     )
     fasttext_embeddings = fasttext_model.fit_transform(df["title"])

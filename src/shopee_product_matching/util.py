@@ -269,6 +269,11 @@ def string_escape(s, encoding="utf-8"):
 def get_model_path(model_name: str) -> Path:
     if is_kaggle():
         model_name = "".join(c for c in model_name if c != "=")
+
+    p = Paths.requirements2 / model_name
+    if p.exists():
+        return p
+
     return Paths.requirements / model_name
 
 

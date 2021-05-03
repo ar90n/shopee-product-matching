@@ -8,6 +8,7 @@ from torchvision.io import read_image
 from torchvision.transforms import Compose, Normalize, Resize
 
 ImageTransform = Callable[[str], torch.Tensor]
+TitleTransform = Callable[[str], torch.Tensor]
 
 
 def identity(x: Any) -> Any:

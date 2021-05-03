@@ -1,6 +1,7 @@
 from typing import Callable, Union, Any, List, Dict
 from sklearn.preprocessing import normalize
 
+import cupy
 import numpy as np
 import torch
 from cuml.neighbors import NearestNeighbors
@@ -46,24 +47,34 @@ class KnnMatch:
 
 
 class CosineSimilarityMatch:
-    def __init__(self, threshold=0.3, **kwargs) -> None:
+    def __init__(self, threshold=0.3, chunk: int = 4096, **kwargs) -> None:
         self._threshold = threshold
+        self._chunk = chunk
 
     def __call__(self, embeddings: Union[np.ndarray, torch.Tensor]) -> List[List[int]]:
         if isinstance(embeddings, np.ndarray):
             embeddings = torch.from_numpy(embeddings)
         embeddings = embeddings.to(get_device())
-
         embeddings *= 1.0 / (torch.norm(embeddings, dim=1).reshape(-1, 1) + 1e-12)
-        distances = 1 - torch.matmul(embeddings, embeddings.T).cpu().T
+
+        CTS = len(embeddings) // self._chunk
+        if (len(embeddings) % self._chunk) != 0:
+            CTS += 1
 
         matches: List[List[int]] = []
-        for k in range(embeddings.shape[0]):
-            ids = np.where(
-                distances[
-                    k,
-                ]
-                < self._threshold
-            )[0]
-            matches.append([int(i) for i in ids])
+        for j in range(CTS):
+            a = j * self._chunk
+            b = (j + 1) * self._chunk
+            b = min(b, len(embeddings))
+            distances = 1.0 - torch.matmul(embeddings, embeddings[a:b].T).cpu().T
+            for k in range(b - a):
+                ids = (
+                    torch.where(
+                        distances[
+                            k,
+                        ]
+                        < self._threshold
+                    )[0]
+                )
+                matches.append([int(i) for i in ids])
         return matches

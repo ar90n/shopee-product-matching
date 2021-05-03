@@ -21,6 +21,7 @@ from typing import Dict, Any, Tuple
 import pandas as pd
 import pytorch_lightning as pl
 import timm
+from shopee_product_matching.tasks import test_tfidf
 from shopee_product_matching.transform import read_resize_normalize, identity
 from shopee_product_matching import constants
 from shopee_product_matching.metric import create_metric
@@ -30,6 +31,7 @@ from shopee_product_matching.datamodule import (
     ShopeeDataModule,
     ShopeeDataModuleQueries,
     ShopeeQuery,
+    ShopeeDataModuleTransforms
 )
 from shopee_product_matching.util import (
     JobType,
@@ -38,6 +40,7 @@ from shopee_product_matching.util import (
     get_device,
     is_kaggle,
     get_model_path,
+    string_escape,
 )
 
 # %%
@@ -49,53 +52,58 @@ if is_kaggle():
 # %%
 def get_config_defaults() -> Dict[str, Any]:
     return {
-        "is_cv": True,
+        "is_cv": False,
         "test_batch_size": 16,
         "num_workers": 4,
         "image_size": 512,
-        "backbone": "efficientnet_b0",
-        "metric": "arcface",
-        "checkpoint_filenames": [
-            "exp-005-effb0/exp-005-fold4-epoch7-val_loss0.00.ckpt",
-#            "exp-005-effb0/exp-005-fold3-epoch8-val_loss0.00.ckpt",
-#            "exp-005-effb0/exp-005-fold2-epoch8-val_loss0.00.ckpt",
-#            "exp-005-effb0/exp-005-fold1-epoch6-val_loss0.00.ckpt",
-#            "exp-005-effb0/exp-005-fold0-epoch5-val_loss0.00.ckpt",
+        "model_params": [
+            (
+                "efficientnet_b0",
+                "exp-005-effb0/exp-005-fold4-epoch7-val_loss0.00.ckpt",
+                "arcface",
+            ),
+            (
+                "efficientnet_b0",
+                "exp-005-effb0/exp-005-fold3-epoch8-val_loss0.00.ckpt",
+                "arcface",
+            ),
+            (
+                "efficientnet_b3",
+                "exp-005-effb3/exp-005-fold0-epoch7-val_loss0.00.ckpt",
+                "arcface",
+            ),
         ],
     }
 
 
 # %%
-def create_datamodule(config: Any, fold: int) -> ShopeeDataModule:
+def create_datamodule(config: Any) -> ShopeeDataModule:
     queries = ShopeeDataModuleQueries(
         test=ShopeeQuery(image=read_resize_normalize(config), posting_id=identity),
     )
 
-    def test_valid_split(df: pd.DataFrame, _: Any) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        from shopee_product_matching.constants import Paths
+    def _escape(df: pd.DataFrame) -> pd.DataFrame:
+        df["title"] = df["title"].apply(string_escape)
+        return df
 
-        fold_df = pd.read_csv(Paths.requirements / "fold.csv", index_col=0)
-        train_df = df[fold_df["fold"] != fold]
-        valid_df = df[fold_df["fold"] == fold]
-        return train_df, valid_df
+    transforms = ShopeeDataModuleTransforms(test=_escape)
 
-    return ShopeeDataModule(config, queries, test_valid_split)
+    dm = ShopeeDataModule(config, queries, transforms=transforms)
+    dm.setup()
+    return dm
 
 
 # %%
-def create_system(config: Any, checkpoint_filename: str) -> pl.LightningModule:
+def create_system(config: Any, model_param: Tuple[str, str, str]) -> pl.LightningModule:
+    backbone_name, checkpoint_filename, metric = model_param
     tag = Path(checkpoint_filename).stem
     backbone = timm.create_model(
-        config.backbone, pretrained=True, num_classes=0, global_pool=""
+        backbone_name, pretrained=True, num_classes=0, global_pool=""
     )
     metric = create_metric(
-        config.metric,
+        metric,
         num_features=backbone.num_features,
         num_classes=constants.TrainData.label_group_unique_unique_count,
-        s=30.0,
-        m=0.50,
-        easy_margin=False,
-        ls_eps=0.0,
     )
     shopee_net = ImageMetricLearning.load_from_checkpoint(
         str(get_model_path(checkpoint_filename)),
@@ -118,12 +126,15 @@ def create_trainer(config: Any) -> ShopeeTrainer:
 def infer() -> None:
     config_defaults = get_config_defaults()
     with context(config_defaults, JobType.Inferene) as config:
+        dm = create_datamodule(config)
         trainer = create_trainer(config)
 
+        df = dm._test_dataset.df
         with ensemble():
-            for i, checkpoint_filename in enumerate(config.checkpoint_filenames):
-                dm = create_datamodule(config, i)
-                system = create_system(config, checkpoint_filename)
+            test_tfidf.main(df, param={"threshold": 0.6})
+
+            for model_param in config.model_params:
+                system = create_system(config, model_param)
                 trainer.test(system, datamodule=dm)
 
 

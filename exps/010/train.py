@@ -18,6 +18,7 @@
 # %autoreload 2
 
 # %%
+import hashlib
 from typing import Dict, Any, Tuple
 
 import torch
@@ -44,10 +45,11 @@ from shopee_product_matching.transform import (
     label_group_encoding,
     identity,
 )
+from shopee_product_matching.tasks import transform_laser
 from shopee_product_matching.constants import Paths
 from shopee_product_matching.feature import LaserEmbedding
 from shopee_product_matching.metric import create_metric
-from shopee_product_matching.system import TitleMetricLearning
+from shopee_product_matching.system import ImageMetricLearning
 from shopee_product_matching.trainer import ShopeeTrainer
 from shopee_product_matching.util import (
     JobType,
@@ -58,6 +60,7 @@ from shopee_product_matching.util import (
 from shopee_product_matching.datamodule import (
     ShopeeDataModule,
     ShopeeDataModuleQueries,
+    ShopeeProp,
     ShopeeQuery,
 )
 
@@ -65,17 +68,17 @@ from shopee_product_matching.datamodule import (
 # %%
 def get_config_defaults() -> Dict[str, Any]:
     return {
-        "train_batch_size": 16,
-        "valid_batch_size": 16,
-        "num_workers": 4,
-        "max_epochs": 4,
+        "train_batch_size": 64,
+        "valid_batch_size": 64,
+        "num_workers": 0,
+        "max_epochs": 15,
         "metric": "arcface",
-        "num_fc": 1,
+        "num_fc": 5,
         "num_features": 512,
-        "overfit_batches": 0.01,
+        "overfit_batches": 0,
         "fast_dev_run": False,
-        "early_stop_patience": 5,
-        "fold": 0,
+        "early_stop_patience": 15,
+        "fold": 1,
     }
 
 
@@ -83,13 +86,17 @@ def get_config_defaults() -> Dict[str, Any]:
 def get_title_transforms(
     config: Any,
 ) -> Tuple[TitleTransform, TitleTransform, TitleTransform]:
-    ind_laser_dir = Paths.requirements / "LASER"
-    ind_laser_model = LaserEmbedding("id", laser_dir=ind_laser_dir)
+    df = pd.read_csv(Paths.shopee_product_matching / "train.csv")
+    title = df["title"].map(string_escape)
+    laser_embedding_map = transform_laser.main(title)
 
-    transform: TitleTransform = lambda x: torch.from_numpy(
-        ind_laser_model.transform(string_escape(x))
-    ).squeeze()
-    return (transform, transform, transform)
+    def _transform(title: str) -> torch.Tensor:
+        title = string_escape(title)
+        key = hashlib.sha224(title.encode()).hexdigest()
+        ret = torch.from_numpy(laser_embedding_map[key])
+        return ret
+
+    return (_transform, _transform, _transform)
 
 
 # %%
@@ -129,7 +136,7 @@ def create_datamodule(config: Any) -> ShopeeDataModule:
 def create_system(config: Any) -> pl.LightningModule:
     metric = create_metric(
         config.metric,
-        num_features=1024,
+        num_features=config.num_features,
         num_classes=constants.TrainData.label_group_unique_unique_count,
     )
     head_layers = [AffineHead(1024, out_dim=config.num_features)]
@@ -137,8 +144,14 @@ def create_system(config: Any) -> pl.LightningModule:
         head_layers.append(AffineHead(config.num_features, out_dim=config.num_features))
     head = nn.Sequential(*head_layers)
 
-    param = TitleMetricLearning.Param(max_lr=1e-5 * config.train_batch_size)
-    shopee_net = TitleMetricLearning(param=param, head=head, metric=metric)
+    param = ImageMetricLearning.Param(max_lr=1e-5 * config.train_batch_size)
+    shopee_net = ImageMetricLearning(
+        param=param,
+        pooling=nn.Identity(),
+        head=head,
+        metric=metric,
+        source_prop=ShopeeProp.title,
+    )
     shopee_net.to(get_device())
 
     return shopee_net
@@ -163,7 +176,7 @@ def train() -> None:
 
 
 if __name__ == "__main__":
-    #from shopee_product_matching import agent
+    # from shopee_product_matching import agent
 
-    #agent.run(train)
+    # agent.run(train)
     train()

@@ -1,0 +1,13 @@
+name: effb1-cv
+method: grid
+parameters:
+  backbone:
+    values:
+      - efficientnet_b1
+  fold:
+    values:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
