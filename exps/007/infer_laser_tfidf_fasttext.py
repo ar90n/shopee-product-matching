@@ -31,7 +31,7 @@ with ensemble():
     ind_laser_preds = find_matches(
         posting_ids=posting_ids,
         embeddings=ind_laser_embeddings,
-        matcher=KnnMatch(threshold=0.25),
+        matcher=KnnMatch(threshold=0.22),
     )
     save_submission_csv(posting_ids, ind_laser_preds, "submission_ind_laser.csv")
 
@@ -40,7 +40,7 @@ with ensemble():
     tfidf_preds = find_matches(
         posting_ids=posting_ids,
         embeddings=tfidf_embeddings,
-        matcher=CosineSimilarityMatch(threshold=0.4),
+        matcher=CosineSimilarityMatch(threshold=0.33),
     )
     save_submission_csv(posting_ids, tfidf_preds, "submission_tfidf.csv")
 
@@ -56,7 +56,7 @@ with ensemble():
     fasttext_preds = find_matches(
         posting_ids=posting_ids,
         embeddings=fasttext_embeddings,
-        matcher=KnnMatch(threshold=0.5),
+        matcher=KnnMatch(threshold=0.4),
     )
     save_submission_csv(posting_ids, fasttext_preds, "submission_fasttext.csv")
 

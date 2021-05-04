@@ -63,8 +63,9 @@ def get_config_defaults() -> Dict[str, Any]:
         "train_batch_size": 16,
         "valid_batch_size": 16,
         "num_workers": 4,
-        "max_epochs": 20,
-        "backbone": "efficientnet_b0",
+        #"max_epochs": 20,
+        "max_epochs": 5,
+        "backbone": "efficientnet_v2s",
         "image_size": 512,
         "overfit_batches": 0,
         "fast_dev_run": False,
@@ -117,6 +118,7 @@ def create_datamodule(config: Any) -> ShopeeDataModule:
         df: pd.DataFrame, config: Any
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         from shopee_product_matching.constants import Paths
+
         fold_df = pd.read_csv(Paths.requirements / "fold.csv", index_col=0)
         train_df = df[fold_df["fold"] != config.fold]
         valid_df = df[fold_df["fold"] == config.fold]
@@ -133,10 +135,6 @@ def create_system(config: Any) -> pl.LightningModule:
     metric = ArcMarginProduct(
         backbone.num_features,
         constants.TrainData.label_group_unique_unique_count,
-        s=30.0,
-        m=0.50,
-        easy_margin=False,
-        ls_eps=0.0,
     )
     param = ImageMetricLearning.Param(max_lr=1e-5 * config.train_batch_size)
     shopee_net = ImageMetricLearning(param=param, backbone=backbone, metric=metric)
@@ -147,14 +145,14 @@ def create_system(config: Any) -> pl.LightningModule:
 
 # %%
 def create_trainer(config: Any) -> ShopeeTrainer:
-    trainer = ShopeeTrainer(config, ckpt_filename_base="exp-005")
+    trainer = ShopeeTrainer(config, ckpt_filename_base="exp-011")
     return trainer
 
 
 # %%
 def train() -> None:
     config_defaults = get_config_defaults()
-    with context(config_defaults, JobType.Training) as config:
+    with context(config_defaults, JobType.Inferene) as config:
         dm = create_datamodule(config)
         system = create_system(config)
         trainer = create_trainer(config)
@@ -166,4 +164,5 @@ def train() -> None:
 if __name__ == "__main__":
     from shopee_product_matching import agent
 
-    agent.run(train)
+    #agent.run(train)
+    train()
