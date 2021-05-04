@@ -36,6 +36,7 @@ from torchvision.transforms import (
 )
 
 from shopee_product_matching import constants
+from shopee_product_matching.neighbor import CosineSimilarityMatch
 from shopee_product_matching.transform import (
     read_resize_normalize,
     imread,
@@ -63,13 +64,13 @@ def get_config_defaults() -> Dict[str, Any]:
         "train_batch_size": 16,
         "valid_batch_size": 16,
         "num_workers": 4,
-        #"max_epochs": 20,
-        "max_epochs": 5,
+        "max_epochs": 15,
         "backbone": "efficientnet_v2s",
         "image_size": 512,
         "overfit_batches": 0,
         "fast_dev_run": False,
         "early_stop_patience": 5,
+        "match_threshold": 0.45,
         "fold": 0,
     }
 
@@ -108,7 +109,7 @@ def create_datamodule(config: Any) -> ShopeeDataModule:
         ),
         valid=ShopeeQuery(
             image=valid_transform,
-            label_group=label_group_transform,
+            label_group=identity,
             posting_id=identity,
         ),
         test=ShopeeQuery(image=test_transform),
@@ -134,10 +135,11 @@ def create_system(config: Any) -> pl.LightningModule:
     )
     metric = ArcMarginProduct(
         backbone.num_features,
-        constants.TrainData.label_group_unique_unique_count,
+        constants.TrainData.label_group_unique_count_pdf_fold,
     )
+    match = CosineSimilarityMatch(config.match_threshold)
     param = ImageMetricLearning.Param(max_lr=1e-5 * config.train_batch_size)
-    shopee_net = ImageMetricLearning(param=param, backbone=backbone, metric=metric)
+    shopee_net = ImageMetricLearning(param=param, backbone=backbone, metric=metric, match=match)
     shopee_net.to(get_device())
 
     return shopee_net
@@ -152,7 +154,7 @@ def create_trainer(config: Any) -> ShopeeTrainer:
 # %%
 def train() -> None:
     config_defaults = get_config_defaults()
-    with context(config_defaults, JobType.Inferene) as config:
+    with context(config_defaults, JobType.Training) as config:
         dm = create_datamodule(config)
         system = create_system(config)
         trainer = create_trainer(config)
@@ -164,5 +166,4 @@ def train() -> None:
 if __name__ == "__main__":
     from shopee_product_matching import agent
 
-    #agent.run(train)
-    train()
+    agent.run(train)

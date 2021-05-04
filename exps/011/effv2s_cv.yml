@@ -1,0 +1,16 @@
+name: effv2s-cv
+method: grid
+parameters:
+  backbone:
+    values:
+      - efficientnet_v2s
+  match_threshold:
+    values:
+      - 0.45
+  fold:
+    values:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
