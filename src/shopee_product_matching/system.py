@@ -2,11 +2,14 @@ from dataclasses import asdict, dataclass
 from typing import Any, Dict, List
 
 import numpy as np
+import pandas as pd
 import pytorch_lightning as pl
 import torch
+from pytorch_lightning.core.lightning import LightningModule
 from torch import nn
 
 from .datamodule import ShopeeProp
+from .feature import find_matches
 from .metric import f1_score
 from .scheduler import ADSRScheduler
 from .neighbor import CosineSimilarityMatch, KnnMatch
@@ -97,7 +100,6 @@ class ImageMetricLearning(pl.LightningModule):
             expect_matches = get_matches(
                 acc_outputs["posting_ids"], acc_outputs["label_groups"]
             )
-            print(index_matches[:16])
             valid_f1 = f1_score(infer_matches, expect_matches)
         except ValueError:
             valid_f1 = float("nan")

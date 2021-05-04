@@ -19,14 +19,16 @@ def label_group_encoding(config: Any) -> Callable[[int], torch.Tensor]:
     train_df = pd.read_csv(Paths.shopee_product_matching / "train.csv", index_col=0)
     fold_df = pd.read_csv(Paths.requirements / "fold.csv", index_col=0)
     all_df = pd.concat(
-        [train_df["label_group"], fold_df["label_group"].rename("label_encoding")],
+        [train_df["label_group"], fold_df["fold"]],
         axis=1,
     )
-    conv_dict: Dict[int, int] = (
-        all_df.drop_duplicates("label_group")
-        .set_index("label_group")
-        .to_dict("series")["label_encoding"]
-    )
+
+    conv_dict: Dict[int, int] = {
+        k: v
+        for v, k in enumerate(
+            all_df[all_df["fold"] != config.fold]["label_group"].unique()
+        )
+    }
 
     def _f(label_group: int) -> torch.Tensor:
         return torch.tensor(conv_dict[label_group])
@@ -50,7 +52,9 @@ def imread(
     return _f
 
 
-def read_resize_normalize(config: Any, data_type: Optional[str]=None) -> Callable[[Any], Any]:
+def read_resize_normalize(
+    config: Any, data_type: Optional[str] = None
+) -> Callable[[Any], Any]:
     return Compose(
         [
             imread(data_type, config.get("is_cv")),

@@ -22,6 +22,10 @@ class _TrainData:
     def label_group_unique_unique_count(self) -> int:
         return 11014
 
+    @property
+    def label_group_unique_count_pdf_fold(self) -> int:
+        return 8812
+
 
 class _Paths:
     @property
