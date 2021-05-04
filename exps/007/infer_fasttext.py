@@ -4,7 +4,7 @@ from typing import List, Dict, Tuple
 
 
 from shopee_product_matching.constants import Paths
-from shopee_product_matching.neighbor import KnnMatch
+from shopee_product_matching.neighbor import CosineSimilarityMatch, KnnMatch
 from shopee_product_matching.metric import f1_score
 from shopee_product_matching.util import get_matches, get_model_path
 from shopee_product_matching.feature import FastTextEmbedding, TfIdfEmbedding
@@ -15,10 +15,10 @@ tfidf_model = TfIdfEmbedding()
 tfidf_model.fit(df["title"])
 
 fasttext_model = FastTextEmbedding(
-    dim=300,
-    epoch=128,
+    dim=100,
+    epoch=32,
     model="skipgram",
-    pretrained_vectors=get_model_path("cc.id.300.vec"),
+    #pretrained_vectors=get_model_path("cc.id.300.vec"),
     agg_func=FastTextEmbedding.create_tfidf_agg_func(tfidf_model),
 )
 fasttext_embeddings = fasttext_model.fit_transform(df["title"])
@@ -32,4 +32,4 @@ def doit(th):
     f1 = f1_score(infer_matches, exp)
     print(f1)
 
-print([doit(i * 0.5) for i in range(20)])
+print([doit(i * 0.5) for i in range(10)])

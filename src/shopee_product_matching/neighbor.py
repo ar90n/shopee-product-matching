@@ -49,9 +49,10 @@ class KnnMatch:
 
 
 class CosineSimilarityMatch:
-    def __init__(self, threshold=0.3, chunk: int = 4096, **kwargs) -> None:
+    def __init__(self, threshold=0.3, chunk: int = 4096, knn:int = 256, **kwargs) -> None:
         self._threshold = threshold
         self._chunk = chunk
+        self._knn = knn
 
     def __call__(
         self, embeddings: Union[np.ndarray, cupy.core.core.ndarray, torch.Tensor]
@@ -72,6 +73,7 @@ class CosineSimilarityMatch:
             a = j * self._chunk
             b = (j + 1) * self._chunk
             b = min(b, len(embeddings))
+            print(f"{a} to {b}")
             distances = 1.0 - torch.matmul(embeddings, embeddings[a:b].T).cpu().T
             for k in range(b - a):
                 ids = torch.where(
@@ -79,8 +81,8 @@ class CosineSimilarityMatch:
                         k,
                     ]
                     < self._threshold
-                )[0]
-                ids = [int(i) for i in ids]
+                )[0][:self._knn]
+                ids = list(ids)
                 if len(ids) == 0:
                     ids.append(k + a)
                 matches.append(ids)

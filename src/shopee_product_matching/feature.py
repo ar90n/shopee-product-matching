@@ -112,6 +112,7 @@ class FastTextEmbedding:
         word_ngrams: int = 4,
         epoch: int = 128,
         dim: int = 256,
+        min_count: int = 3,
         pretrained_vectors: str = "",
         model="skipgram",
         agg_func=None,
@@ -120,6 +121,7 @@ class FastTextEmbedding:
         self._word_ngrams = word_ngrams
         self._epoch = epoch
         self._dim = dim
+        self._min_count = min_count
         self._pretrained_vectors = pretrained_vectors
         self._model = model
         self._agg_func = agg_func
@@ -129,14 +131,18 @@ class FastTextEmbedding:
         with TemporaryDirectory() as temp:
             input_path = Path(temp) / "input.txt"
             input_path.write_text("\n".join(texts))
-            self._model = fasttext.train_unsupervised(
-                str(input_path),
-                model=self._model,
-                wordNgrams=self._word_ngrams,
-                epoch=self._epoch,
-                dim=self._dim,
-                pretrainedVectors=self._pretrained_vectors,
-            )
+            try:
+                self._model = fasttext.train_unsupervised(
+                    str(input_path),
+                    model=self._model,
+                    wordNgrams=self._word_ngrams,
+                    epoch=self._epoch,
+                    dim=self._dim,
+                    pretrainedVectors=str(self._pretrained_vectors),
+                    minCount=self._min_count,
+                )
+            except ValueError:
+                return np.zeros((len(texts), self._dim))
 
         result = []
         for text in texts:
@@ -184,13 +190,13 @@ class FastTextEmbedding:
         return _f
 
 
-from shopee_product_matching.neighbor import CosineSimilarityMatch
+from shopee_product_matching.neighbor import CosineSimilarityMatch, KnnMatch
 
 
 def find_matches(
-    posting_ids: List[str], embeddings: np.ndarray, threshold: float = 2.7
+    posting_ids: List[str], embeddings: np.ndarray, matcher: Any = KnnMatch(2.7)
 ) -> List[List[str]]:
-    match_ids = CosineSimilarityMatch(threshold=threshold)(embeddings)
+    match_ids = matcher(embeddings)
 
     matches: List[List[str]] = []
     for ids in match_ids:
