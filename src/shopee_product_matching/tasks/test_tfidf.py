@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 
 import pandas as pd
 from shopee_product_matching.feature import TfIdfEmbedding, find_matches
+from shopee_product_matching.neighbor import CosineSimilarityMatch
 from shopee_product_matching.util import save_submission_csv
 
 
@@ -42,9 +43,6 @@ def _main(
     tfidf_embedding_params = {}
     if "max_featreus" in param:
         tfidf_embedding_params["max_features"] = param["max_fetures"]
-    if "n_components" in param:
-        tfidf_embedding_params["n_components"] = param["n_components"]
-
     match_params = {}
     if "threshold" in param:
         match_params["threshold"] = param["threshold"]
@@ -52,7 +50,8 @@ def _main(
     posting_ids = df["posting_id"].to_list()
     tfidf_model = TfIdfEmbedding(**tfidf_embedding_params)
     tfidf_embeddings = tfidf_model.fit_transform(df["title"])
-    tfidf_preds = find_matches( posting_ids=posting_ids, embeddings=tfidf_embeddings, **match_params)
+    tfidf_match = CosineSimilarityMatch(**match_params)
+    tfidf_preds = find_matches( posting_ids=posting_ids, embeddings=tfidf_embeddings, matcher=tfidf_match)
     save_submission_csv(posting_ids, tfidf_preds, "submission_tfidf.csv")
 
 if __name__ == "__main__":

@@ -15,6 +15,27 @@ def identity(x: Any) -> Any:
     return x
 
 
+def label_group_encoding_old(config: Any) -> Callable[[int], torch.Tensor]:
+    train_df = pd.read_csv(Paths.shopee_product_matching / "train.csv", index_col=0)
+    fold_df = pd.read_csv(Paths.requirements / "fold.csv", index_col=0)
+    all_df = pd.concat(
+        [train_df["label_group"], fold_df["label_group"].rename("label_encoding")],
+        axis=1,
+    )
+
+    conv_dict: Dict[int, int] = (
+        all_df.drop_duplicates("label_group")
+        .set_index("label_group")
+        .to_dict("series")["label_encoding"]
+    )
+
+    def _f(label_group: int) -> torch.Tensor:
+        return torch.tensor(conv_dict[label_group])
+
+    return _f
+
+
+
 def label_group_encoding(config: Any) -> Callable[[int], torch.Tensor]:
     train_df = pd.read_csv(Paths.shopee_product_matching / "train.csv", index_col=0)
     fold_df = pd.read_csv(Paths.requirements / "fold.csv", index_col=0)

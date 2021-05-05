@@ -98,7 +98,7 @@ def get_image_transforms(
 # %%
 def create_datamodule(config: Any) -> ShopeeDataModule:
     train_transform, valid_transform, test_transform = get_image_transforms(config)
-    label_group_transform = label_group_encoding(config)
+    label_group_transform = label_group_encoding_old(config)
     queries = ShopeeDataModuleQueries(
         train=ShopeeQuery(
             image=train_transform,
