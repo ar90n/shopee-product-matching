@@ -22,8 +22,9 @@ def create_match(
 
 
 class KnnMatch:
-    def __init__(self, threshold: float = 2.7, **kwargs: Dict[str, Any]) -> None:
+    def __init__(self, threshold: float = 2.7, metric: str = "cosine", **kwargs: Dict[str, Any]) -> None:
         self._threshold = threshold
+        self._metric = metric
 
     def __call__(self, embeddings: Union[np.ndarray, torch.Tensor]) -> List[List[int]]:
         if isinstance(embeddings, torch.Tensor):
@@ -31,7 +32,7 @@ class KnnMatch:
 
         KNN = min(max(3, len(embeddings)), 50)
 
-        model = NearestNeighbors(n_neighbors=KNN)
+        model = NearestNeighbors(n_neighbors=KNN, metric = self._metric)
         model.fit(embeddings)
         distances, indices = model.kneighbors(embeddings)
 
@@ -61,7 +62,7 @@ class CosineSimilarityMatch:
             embeddings = torch.from_numpy(embeddings)
         elif isinstance(embeddings, cupy.core.core.ndarray):
             embeddings = from_dlpack(toDlpack(embeddings))
-        embeddings = embeddings.to(get_device())
+        embeddings = embeddings.to(get_device()).to(torch.float32)
         embeddings *= 1.0 / (torch.norm(embeddings, dim=1).reshape(-1, 1) + 1e-12)
 
         CTS = len(embeddings) // self._chunk

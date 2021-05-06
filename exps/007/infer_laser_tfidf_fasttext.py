@@ -1,4 +1,5 @@
 import fasttext
+from numpy.lib import utils
 import pandas as pd
 
 from shopee_product_matching.feature import (
@@ -13,6 +14,7 @@ from shopee_product_matching.util import (
     ensemble,
     get_matches,
     get_model_path,
+    string_escape,
 )
 from shopee_product_matching.metric import f1_score
 from shopee_product_matching.neighbor import KnnMatch, CosineSimilarityMatch
@@ -27,12 +29,14 @@ posting_ids = df["posting_id"].to_list()
 with ensemble():
     ind_laser_dir = Paths.requirements / "LASER"
     ind_laser_model = LaserEmbedding("id", laser_dir=ind_laser_dir, chunk_size=8192)
-    ind_laser_embeddings = ind_laser_model.transform(df["title"])
+    ind_laser_embeddings = ind_laser_model.transform(df["title"].map(string_escape))
     ind_laser_preds = find_matches(
         posting_ids=posting_ids,
         embeddings=ind_laser_embeddings,
-        matcher=KnnMatch(threshold=0.22),
+        #matcher=CosineSimilarityMatch(threshold=0.14),
+        matcher=CosineSimilarityMatch(threshold=0.1),
     )
+
     save_submission_csv(posting_ids, ind_laser_preds, "submission_ind_laser.csv")
 
     tfidf_model = TfIdfEmbedding()
@@ -44,21 +48,21 @@ with ensemble():
     )
     save_submission_csv(posting_ids, tfidf_preds, "submission_tfidf.csv")
 
-    fasttext_model = FastTextEmbedding(
-        dim=32,
-        epoch=32,
-        model="skipgram",
-        min_count=3,
-        #pretrained_vectors=get_model_path("cc.id.300.vec"),
-        agg_func=FastTextEmbedding.create_tfidf_agg_func(tfidf_model),
-    )
-    fasttext_embeddings = fasttext_model.fit_transform(df["title"])
-    fasttext_preds = find_matches(
-        posting_ids=posting_ids,
-        embeddings=fasttext_embeddings,
-        matcher=KnnMatch(threshold=0.4),
-    )
-    save_submission_csv(posting_ids, fasttext_preds, "submission_fasttext.csv")
+#    fasttext_model = FastTextEmbedding(
+#        dim=32,
+#        epoch=32,
+#        model="skipgram",
+#        min_count=3,
+#        #pretrained_vectors=get_model_path("cc.id.300.vec"),
+#        agg_func=FastTextEmbedding.create_tfidf_agg_func(tfidf_model),
+#    )
+#    fasttext_embeddings = fasttext_model.fit_transform(df["title"])
+#    fasttext_preds = find_matches(
+#        posting_ids=posting_ids,
+#        embeddings=fasttext_embeddings,
+#        matcher=KnnMatch(threshold=0.4),
+#    )
+#    save_submission_csv(posting_ids, fasttext_preds, "submission_fasttext.csv")
 
 if get_cv:
     submission = pd.read_csv("submission.csv", index_col=0)

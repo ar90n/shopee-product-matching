@@ -1,4 +1,5 @@
 from dataclasses import asdict, dataclass
+from functools import total_ordering
 from typing import Any, Dict, List
 
 import numpy as np
@@ -13,7 +14,12 @@ from .feature import find_matches
 from .metric import f1_score
 from .scheduler import ADSRScheduler
 from .neighbor import CosineSimilarityMatch, KnnMatch
-from .util import save_submission_csv, get_matches
+from .util import (
+    get_device,
+    save_submission_csv,
+    save_submission_embedding,
+    get_matches,
+)
 
 
 class ImageMetricLearning(pl.LightningModule):
@@ -32,6 +38,7 @@ class ImageMetricLearning(pl.LightningModule):
         loss=nn.CrossEntropyLoss(),
         match=CosineSimilarityMatch(0.25),
         source_prop: ShopeeProp = ShopeeProp.image,
+        save_submission_embedding: bool = False,
         submission_filename=None,
     ) -> None:
         super().__init__()
@@ -45,6 +52,7 @@ class ImageMetricLearning(pl.LightningModule):
         self.loss = loss
         self.match = match
         self.source_prop = source_prop
+        self.save_submission_embedding = save_submission_embedding
         self.submission_filename = submission_filename
 
     def forward(self, x):
@@ -105,11 +113,25 @@ class ImageMetricLearning(pl.LightningModule):
             valid_f1 = float("nan")
 
         try:
-            inter_intra_class_loss = _calc_inter_intra_class_loss(
+            (
+                inter_intra_class_loss,
+                intra_loss,
+                inter_loss,
+                intra_max,
+                inter_min,
+                intra_quar,
+                inter_quar,
+            ) = _calc_inter_intra_class_loss(
                 acc_outputs["label_groups"], acc_outputs["embeddings"]
             )
         except ValueError:
             inter_intra_class_loss = float("nan")
+            intra_loss = float("nan")
+            inter_loss = float("nan")
+            intra_max = float("nan")
+            inter_min = float("nan")
+            intra_quar = float("nan")
+            inter_quar = float("nan")
 
         self.log(
             "valid_f1",
@@ -123,6 +145,55 @@ class ImageMetricLearning(pl.LightningModule):
         self.log(
             "valid_loss",
             inter_intra_class_loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+        )
+
+        self.log(
+            "valid_intra_loss",
+            intra_loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+        )
+        self.log(
+            "valid_inter_loss",
+            inter_loss,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+        )
+        self.log(
+            "valid_intra_max",
+            intra_max,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+        )
+        self.log(
+            "valid_inter_min",
+            inter_min,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+        )
+        self.log(
+            "valid_intra_quar",
+            intra_quar,
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+        )
+        self.log(
+            "valid_inter_quar",
+            inter_quar,
             on_step=False,
             on_epoch=True,
             prog_bar=True,
@@ -149,6 +220,12 @@ class ImageMetricLearning(pl.LightningModule):
         save_submission_csv(
             acc_outputs["posting_ids"], matches, self.submission_filename
         )
+        if self.save_submission_embedding:
+            save_submission_embedding(
+                acc_outputs["posting_ids"],
+                acc_outputs["embeddings"],
+                self.submission_filename,
+            )
 
 
 def _accumulate_outputs(outputs: List[Dict[str, List[Any]]]) -> Dict[str, Any]:
@@ -176,13 +253,45 @@ def _calc_inter_intra_class_loss(
 ) -> float:
     classes = sorted(np.unique(label_groups))
 
+    embeddings = torch.from_numpy(embeddings).to(get_device()).to(torch.float32)
+    embeddings *= 1.0 / (torch.norm(embeddings, dim=1).reshape(-1, 1) + 1e-12)
+
     centres = []
     for c in classes:
-        centres.append(np.average(embeddings[label_groups == c], axis=0))
+        centres.append(torch.mean(embeddings[label_groups == c], axis=0))
+    centres = torch.stack(centres, axis=0)
 
-    intra_class_losses = []
+    intra_losses = []
+    inter_losses = []
+    intra_inter_class_losses = []
     for c, centre in zip(classes, centres):
-        diff = embeddings[label_groups == c] - centre
-        intra_class_losses.append(np.std(diff))
+        intra_class_distances = (
+            1.0 - torch.matmul(embeddings[label_groups == c], centre.T).cpu().T
+        )
+        mean_intra_class_dist = torch.mean(intra_class_distances)
+        intra_losses.append(mean_intra_class_dist)
 
-    return sum(intra_class_losses) / len(classes)
+        inter_class_distances = 1.0 - torch.matmul(centres, centre.T).cpu().T
+        mean_inter_class_dist = torch.mean(inter_class_distances)
+        inter_losses.append(mean_inter_class_dist)
+
+        loss = mean_intra_class_dist / (mean_inter_class_dist + 1e-12)
+        intra_inter_class_losses.append(loss)
+
+    n = len(classes)
+    intra_loss = sum(intra_losses) / n
+    inter_loss = sum(inter_losses) / n
+    intra_max = max(intra_losses)
+    inter_min = min(inter_losses)
+    intra_quar = sorted(intra_losses)[-(n // 4)]
+    inter_quar = sorted(inter_losses)[(n // 4)]
+    total_loss = sum(intra_inter_class_losses) / n
+    return (
+        total_loss,
+        intra_loss,
+        inter_loss,
+        intra_max,
+        inter_min,
+        intra_quar,
+        inter_quar,
+    )

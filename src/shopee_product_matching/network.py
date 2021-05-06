@@ -8,7 +8,6 @@ class AffineHead(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
         self.fc = nn.Linear(in_dim, out_dim)
         self.bn = nn.BatchNorm1d(out_dim)
-        self.activate = nn.Hardswish()
 
         nn.init.xavier_normal_(self.fc.weight)
         nn.init.constant_(self.fc.bias, 0)
@@ -18,6 +17,5 @@ class AffineHead(nn.Module):
     def forward(self, x) -> Tensor:
         x = self.dropout(x)
         x = self.fc(x)
-        #x = self.bn(x)
-        x = self.activate(x)
+        x = self.bn(x)
         return x

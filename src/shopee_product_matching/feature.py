@@ -65,6 +65,7 @@ class LaserEmbedding:
                 output_path.unlink()
                 results.append(X)
         X = np.vstack(results)
+
         return X
 
 
@@ -200,5 +201,10 @@ def find_matches(
 
     matches: List[List[str]] = []
     for ids in match_ids:
+        for i in ids:
+            if len(posting_ids) <= i:
+                import pdb; pdb.set_trace()
+                break
+
         matches.append([posting_ids[i] for i in ids])
     return matches

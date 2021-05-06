@@ -1,0 +1,17 @@
+name: effb0-param-search
+method: grid
+parameters:
+  backbone:
+    values:
+      - efficientnet_b0
+      - efficientnet_b3
+      - efficientnet_v2s
+  dim_embedding":
+    values:
+      - 256
+      - 512
+      - 1024
+  fold:
+    values:
+      - 0
+      - 1

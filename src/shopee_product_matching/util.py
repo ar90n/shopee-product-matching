@@ -4,7 +4,7 @@ import sys
 from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional, Union
 from tempfile import TemporaryDirectory
 
 import numpy as np
@@ -193,8 +193,22 @@ def ensemble(filename="submission.csv") -> None:
             .applymap(lambda x: " ".join(set(x)))
         )
 
+    def merge_embeddings(
+        embeddings: List[Dict[str, Any]], submission: pd.DataFrame
+    ) -> torch.Tensor:
+        embedding_map: Dict[str, torch.Tensor] = {}
+        for e in embeddings:
+            cur = {k: v for k, v in zip(e["posting_id"], e["embedding"])}
+            embedding_map = {**embedding_map, **cur}
+
+        result = []
+        for p in submission.index.values:
+            result.append(embedding_map[p])
+        return torch.vstack(result)
+
     cur_dir = str(Path.cwd().absolute())
     submissions = []
+    embeddings = []
     with TemporaryDirectory(dir=cur_dir) as temp:
         try:
             os.chdir(temp)
@@ -203,11 +217,19 @@ def ensemble(filename="submission.csv") -> None:
             for p in Path(temp).glob("submission*.csv"):
                 df = pd.read_csv(p, index_col=0).applymap(lambda x: x.split())
                 submissions.append(df)
+
+            for p in Path(temp).glob("submission*.pt"):
+                embeddings.append(torch.load(p))
+
         finally:
             os.chdir(cur_dir)
 
     submission = merge_matches(submissions)
     submission.to_csv(filename)
+
+    if 0 < len(embeddings):
+        embedding = merge_embeddings(embeddings, submission)
+        torch.save(embedding, "submission.pt")
 
 
 def pass_as_image(func: Compose) -> Callable[[np.ndarray], np.ndarray]:
@@ -250,6 +272,20 @@ def save_submission_csv(
     df.to_csv(filename, index=False)
 
 
+def save_submission_embedding(
+    posting_ids: List[str],
+    embeddings: Union[np.ndarray, torch.Tensor],
+    filename: Optional[str],
+) -> None:
+    if isinstance(embeddings, np.ndarray):
+        embeddings = torch.from_numpy(embeddings)
+
+    filename = (
+        "submission.pt" if filename is None else str(Path(filename).with_suffix(".pt"))
+    )
+    torch.save({"posting_id": posting_ids, "embedding": embeddings}, filename)
+
+
 def clean_up() -> None:
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -263,6 +299,7 @@ def string_escape(s, encoding="utf-8"):
         .decode("unicode-escape")  # Perform the actual octal-escaping decode
         .encode("latin1")  # 1:1 mapping back to bytes
         .decode(encoding)
+        .replace("\n", "")
     )  # Decode original encoding
 
 
