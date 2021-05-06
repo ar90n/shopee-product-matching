@@ -153,15 +153,14 @@ def create_system(config: Any) -> pl.LightningModule:
 
 # %%
 def create_trainer(config: Any) -> ShopeeTrainer:
-    #trainer = ShopeeTrainer(config, ckpt_filename_base="exp-011")
-    trainer = ShopeeTrainer(config, ckpt_filename_base="exp-011", monitor="valid_f1", mode="max")
+    trainer = ShopeeTrainer(config, ckpt_filename_base="exp-013")
     return trainer
 
 
 # %%
 def train() -> None:
     config_defaults = get_config_defaults()
-    with context(config_defaults, JobType.Inferene) as config:
+    with context(config_defaults, JobType.Training) as config:
         dm = create_datamodule(config)
         system = create_system(config)
         trainer = create_trainer(config)
@@ -173,5 +172,4 @@ def train() -> None:
 if __name__ == "__main__":
     from shopee_product_matching import agent
 
-    #agent.run(train)
-    train()
+    agent.run(train)
