@@ -312,6 +312,7 @@ def save_submission_confidence(
     embeddings: Union[np.ndarray, torch.Tensor],
     threshold: float,
     filename: Optional[str],
+    weight:float = 1.0
 ) -> None:
     if isinstance(embeddings, np.ndarray):
         embeddings = torch.from_numpy(embeddings)
@@ -345,7 +346,7 @@ def save_submission_confidence(
     records = []
     for k0, vs in matches.items():
         for k1, d in vs:
-            records.append({"posting_id": k0, "neighbor": k1, "dist": d})
+            records.append({"posting_id": k0, "neighbor": k1, "dist": weight * kd, "weight": weight})
     df = pd.DataFrame.from_records(records)
     filename = (
         "submission.pkl"

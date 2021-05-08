@@ -54,7 +54,7 @@ if is_kaggle():
 # %%
 def get_config_defaults() -> Dict[str, Any]:
     return {
-        "is_cv": False,
+        "is_cv": True,
         "test_batch_size": 16,
         "num_workers": 4,
         "image_size": 512,
@@ -107,6 +107,7 @@ def create_datamodule(config: Any) -> ShopeeDataModule:
 
     def _escape(df: pd.DataFrame) -> pd.DataFrame:
         df["title"] = df["title"].apply(string_escape)
+        df = df.iloc[:1024]
         return df
 
     transforms = ShopeeDataModuleTransforms(test=_escape)
@@ -160,7 +161,8 @@ def infer() -> None:
                 trainer.test(system, datamodule=dm)
 
             test_tfidf.main(df, param={"max_features": 20000, "threshold": 0.20})
-            test_laser.main(df, param={"threshold": 0.08})
+            test_laser.main(df, param={"threshold": 0.08},save_submission_confidence=True)
+            import pdb; pdb.set_trace()
 
 
 # %%

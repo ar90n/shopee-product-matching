@@ -1,0 +1,15 @@
+name: effb0-dim-cv
+method: grid
+parameters:
+  backbone:
+    values:
+      - "efficientnet_b0"
+  dim_embedding:
+    values:
+      - 512
+      - 1024
+  fold:
+    values:
+      - 0
+      - 1
+      - 2
