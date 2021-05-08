@@ -1,0 +1,10 @@
+name: eca_nfnet_l1_cv
+method: grid
+parameters:
+  backbone:
+    values:
+      - efficientnet_b0
+      - eca_nfnet_l0
+  fold:
+    values:
+      - 0

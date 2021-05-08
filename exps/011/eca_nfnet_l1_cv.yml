@@ -1,0 +1,16 @@
+name: eca_nfnet_l1_cv
+method: grid
+parameters:
+  backbone:
+    values:
+      - eca_nfnet_l1
+  match_threshold:
+    values:
+      - 0.3
+  fold:
+    values:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4

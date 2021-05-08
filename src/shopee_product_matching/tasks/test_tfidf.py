@@ -41,8 +41,8 @@ def _main(
     param = {} if param is None else param
 
     tfidf_embedding_params = {}
-    if "max_featreus" in param:
-        tfidf_embedding_params["max_features"] = param["max_fetures"]
+    if "max_features" in param:
+        tfidf_embedding_params["max_features"] = param["max_features"]
     match_params = {}
     if "threshold" in param:
         match_params["threshold"] = param["threshold"]

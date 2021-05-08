@@ -17,6 +17,7 @@ from .neighbor import CosineSimilarityMatch, KnnMatch
 from .util import (
     get_device,
     save_submission_csv,
+    save_submission_confidence,
     save_submission_embedding,
     get_matches,
 )
@@ -39,6 +40,7 @@ class ImageMetricLearning(pl.LightningModule):
         match=CosineSimilarityMatch(0.25),
         source_prop: ShopeeProp = ShopeeProp.image,
         save_submission_embedding: bool = False,
+        save_submission_confidence: bool = False,
         submission_filename=None,
     ) -> None:
         super().__init__()
@@ -53,6 +55,7 @@ class ImageMetricLearning(pl.LightningModule):
         self.match = match
         self.source_prop = source_prop
         self.save_submission_embedding = save_submission_embedding
+        self.save_submission_confidence = save_submission_confidence
         self.submission_filename = submission_filename
 
     def forward(self, x):
@@ -105,8 +108,9 @@ class ImageMetricLearning(pl.LightningModule):
                 for match in index_matches
             ]
 
+            label_groups = acc_outputs["label_groups"].detach().cpu().numpy().squeeze()
             expect_matches = get_matches(
-                acc_outputs["posting_ids"], acc_outputs["label_groups"]
+                acc_outputs["posting_ids"], label_groups
             )
             valid_f1 = f1_score(infer_matches, expect_matches)
         except ValueError:
@@ -212,14 +216,23 @@ class ImageMetricLearning(pl.LightningModule):
 
     def test_epoch_end(self, outputs: Dict[str, List[Any]]) -> None:
         acc_outputs = _accumulate_outputs(outputs)
-        index_matches = self.match(acc_outputs["embeddings"])
-        matches = [
-            [acc_outputs["posting_ids"][i] for i in match] for match in index_matches
-        ]
 
-        save_submission_csv(
-            acc_outputs["posting_ids"], matches, self.submission_filename
-        )
+        if self.save_submission_confidence:
+            save_submission_confidence(
+                acc_outputs["posting_ids"],
+                acc_outputs["embeddings"],
+                self.match._threshold,
+                self.submission_filename,
+            )
+        else:
+            index_matches = self.match(acc_outputs["embeddings"])
+            matches = [
+                [acc_outputs["posting_ids"][i] for i in match] for match in index_matches
+            ]
+
+            save_submission_csv(
+                acc_outputs["posting_ids"], matches, self.submission_filename
+            )
         if self.save_submission_embedding:
             save_submission_embedding(
                 acc_outputs["posting_ids"],
@@ -235,25 +248,28 @@ def _accumulate_outputs(outputs: List[Dict[str, List[Any]]]) -> Dict[str, Any]:
 
     for output in outputs:
         embeddings.append(
-            [t.detach().cpu().numpy() for t in output.get("embeddings", [])]
+            [t for t in output.get("embeddings", [])]
         )
         posting_ids.append(output.get("posting_id", []))
         label_groups.append(
-            [t.detach().cpu().numpy() for t in output.get("label_group", [])]
+            [t for t in output.get("label_group", [])]
         )
-    return {
-        "embeddings": np.concatenate(embeddings),
+    ret = {
+        "embeddings": torch.vstack(sum(embeddings, [])),
         "posting_ids": sum(posting_ids, []),
-        "label_groups": np.concatenate(label_groups),
     }
+    if 0 < len(label_groups[0]):
+        ret["label_groups"] =torch.vstack(sum(label_groups, [])) 
+    return ret
 
 
 def _calc_inter_intra_class_loss(
-    label_groups: np.ndarray, embeddings: np.ndarray
+    label_groups: torch.Tensor, embeddings: torch.Tensor
 ) -> float:
-    classes = sorted(np.unique(label_groups))
+    label_groups = label_groups.squeeze()
+    classes = sorted(torch.unique(label_groups).detach().cpu().numpy().squeeze())
 
-    embeddings = torch.from_numpy(embeddings).to(get_device()).to(torch.float32)
+    embeddings = embeddings.to(torch.float32)
     embeddings *= 1.0 / (torch.norm(embeddings, dim=1).reshape(-1, 1) + 1e-12)
 
     centres = []

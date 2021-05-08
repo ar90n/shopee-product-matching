@@ -1,0 +1,16 @@
+name: nf_regnet_b1_cv
+method: grid
+parameters:
+  backbone:
+    values:
+      - nf_regnet_b1
+  match_threshold:
+    values:
+      - 0.3
+  fold:
+    values:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4

@@ -184,7 +184,7 @@ def context(
 
 
 @contextmanager
-def ensemble(filename="submission.csv") -> None:
+def ensemble(filename="submission.csv", conf_threshold = 0.75) -> None:
     def merge_matches(submissions: List[pd.DataFrame]) -> pd.DataFrame:
         return (
             pd.concat(submissions)
@@ -192,6 +192,20 @@ def ensemble(filename="submission.csv") -> None:
             .sum()
             .applymap(lambda x: " ".join(set(x)))
         )
+
+    def merge_distances(submissions: List[pd.DataFrame], th: float) -> pd.DataFrame:
+        for i, s in enumerate(submissions):
+            s["i"]  = i
+        df = pd.concat(submissions)
+        counts = df.groupby(["posting_id"])[["i"]].agg(lambda x: len(set(x)))
+        df = df.groupby(["posting_id", "neighbor"])[["dist"]].sum()
+        df = df.reset_index()
+        df["r"] = df["dist"] / df["posting_id"].map(counts.i)
+        df["neighbor"] = df["neighbor"].apply(lambda x: [x])
+        res = pd.DataFrame(
+            df[th < df["r"]].groupby("posting_id")["neighbor"].sum()
+        ).rename(columns={"neighbor": "matches"})
+        return res
 
     def merge_embeddings(
         embeddings: List[Dict[str, Any]], submission: pd.DataFrame
@@ -209,6 +223,7 @@ def ensemble(filename="submission.csv") -> None:
     cur_dir = str(Path.cwd().absolute())
     submissions = []
     embeddings = []
+    distances = []
     with TemporaryDirectory(dir=cur_dir) as temp:
         try:
             os.chdir(temp)
@@ -221,8 +236,14 @@ def ensemble(filename="submission.csv") -> None:
             for p in Path(temp).glob("submission*.pt"):
                 embeddings.append(torch.load(p))
 
+            for p in Path(temp).glob("submission*.pkl"):
+                distances.append(pd.read_pickle(p))
         finally:
             os.chdir(cur_dir)
+
+    if 0 < len(distances):
+        dist_submission = merge_distances(distances, conf_threshold)
+        submissions.append(dist_submission)
 
     submission = merge_matches(submissions)
     submission.to_csv(filename)
@@ -284,6 +305,54 @@ def save_submission_embedding(
         "submission.pt" if filename is None else str(Path(filename).with_suffix(".pt"))
     )
     torch.save({"posting_id": posting_ids, "embedding": embeddings}, filename)
+
+
+def save_submission_confidence(
+    posting_ids: List[str],
+    embeddings: Union[np.ndarray, torch.Tensor],
+    threshold: float,
+    filename: Optional[str],
+) -> None:
+    if isinstance(embeddings, np.ndarray):
+        embeddings = torch.from_numpy(embeddings)
+
+    chunk = 4096
+    embeddings = embeddings.to(get_device()).to(torch.float32)
+    embeddings *= 1.0 / (torch.norm(embeddings, dim=1).reshape(-1, 1) + 1e-12)
+
+    CTS = len(embeddings) // chunk
+    if (len(embeddings) % chunk) != 0:
+        CTS += 1
+
+    matches: Dict[str, List[int]] = {}
+    for j in range(CTS):
+        a = j * chunk
+        b = (j + 1) * chunk
+        b = min(b, len(embeddings))
+        print(f"{a} to {b}")
+        distances = torch.matmul(embeddings, embeddings[a:b].T).cpu().T
+        distances = torch.clamp(distances, 0.0, 1.0)
+        for k in range(b - a):
+            ids = torch.where((1 - threshold) < distances[k,])[
+                0
+            ][:256]
+            ids = list(ids)
+            dists = [float(v) for v in distances[k, ids]]
+            pids = [posting_ids[i] for i in ids]
+            values = list(zip(pids, dists))
+            matches[posting_ids[(k + a)]] = values
+
+    records = []
+    for k0, vs in matches.items():
+        for k1, d in vs:
+            records.append({"posting_id": k0, "neighbor": k1, "dist": d})
+    df = pd.DataFrame.from_records(records)
+    filename = (
+        "submission.pkl"
+        if filename is None
+        else str(Path(filename).with_suffix(".pkl"))
+    )
+    df.to_pickle(filename)
 
 
 def clean_up() -> None:

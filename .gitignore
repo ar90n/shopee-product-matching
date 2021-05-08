@@ -135,3 +135,5 @@ lightning_logs
 **/*.ipynb
 **/submission*.csv
 *.pickle
+*.pkl
+*.pt
