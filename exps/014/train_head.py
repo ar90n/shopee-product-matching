@@ -152,7 +152,7 @@ def create_system(config: Any) -> pl.LightningModule:
 
 # %%
 def create_trainer(config: Any) -> ShopeeTrainer:
-    trainer = ShopeeTrainer(config, ckpt_filename_base="exp-014", monitor="valid_inter_quar", mode="max")
+    trainer = ShopeeTrainer(config, ckpt_filename_base="exp-014", monitor="valid_inter_min", mode="max")
     return trainer
 
 

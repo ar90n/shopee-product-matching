@@ -13,7 +13,7 @@ from shopee_product_matching.neighbor import CosineSimilarityMatch, KnnMatch
 def main(
     df: pd.DataFrame,
     param: Dict[str, Any],
-    save_submission_confidence=False,
+    save_confidence=False,
     weight=1.0,
 ) -> None:
     posting_ids = df["posting_id"].to_list()
@@ -22,7 +22,7 @@ def main(
     ind_laser_model = LaserEmbedding("id", laser_dir=ind_laser_dir)
     ind_laser_embeddings = ind_laser_model.transform(df["title"])
 
-    if save_submission_confidence:
+    if save_confidence:
         save_submission_confidence(
             posting_ids,
             ind_laser_embeddings,

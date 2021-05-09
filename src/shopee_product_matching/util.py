@@ -184,7 +184,7 @@ def context(
 
 
 @contextmanager
-def ensemble(filename="submission.csv", conf_threshold = 0.75) -> None:
+def ensemble(filename="submission.csv", conf_threshold=0.75) -> None:
     def merge_matches(submissions: List[pd.DataFrame]) -> pd.DataFrame:
         return (
             pd.concat(submissions)
@@ -194,13 +194,19 @@ def ensemble(filename="submission.csv", conf_threshold = 0.75) -> None:
         )
 
     def merge_distances(submissions: List[pd.DataFrame], th: float) -> pd.DataFrame:
+        ws = []
         for i, s in enumerate(submissions):
-            s["i"]  = i
+            s["i"] = i
+            ws.append(s.iloc[0]["weight"])
         df = pd.concat(submissions)
-        counts = df.groupby(["posting_id"])[["i"]].agg(lambda x: len(set(x)))
+        total_weights = df.groupby(["posting_id"])[["i"]].agg(
+            lambda x: sum(ws[i] for i in set(x))
+        )
+
+        # dist was aslready multiplied by weight
         df = df.groupby(["posting_id", "neighbor"])[["dist"]].sum()
         df = df.reset_index()
-        df["r"] = df["dist"] / df["posting_id"].map(counts.i)
+        df["r"] = df["dist"] / df["posting_id"].map(total_weights.i)
         df["neighbor"] = df["neighbor"].apply(lambda x: [x])
         res = pd.DataFrame(
             df[th < df["r"]].groupby("posting_id")["neighbor"].sum()
@@ -312,7 +318,7 @@ def save_submission_confidence(
     embeddings: Union[np.ndarray, torch.Tensor],
     threshold: float,
     filename: Optional[str],
-    weight:float = 1.0
+    weight: float = 1.0,
 ) -> None:
     if isinstance(embeddings, np.ndarray):
         embeddings = torch.from_numpy(embeddings)
@@ -346,7 +352,9 @@ def save_submission_confidence(
     records = []
     for k0, vs in matches.items():
         for k1, d in vs:
-            records.append({"posting_id": k0, "neighbor": k1, "dist": weight * kd, "weight": weight})
+            records.append(
+                {"posting_id": k0, "neighbor": k1, "dist": weight * d, "weight": weight}
+            )
     df = pd.DataFrame.from_records(records)
     filename = (
         "submission.pkl"

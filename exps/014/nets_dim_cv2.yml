@@ -1,0 +1,12 @@
+name: net2-dim-cv2
+method: grid
+parameters:
+  backbone:
+    values:
+      - "eca_nfnet_l1"
+  dim_embedding:
+    values:
+      - 1024
+  fold:
+    values:
+      - 4

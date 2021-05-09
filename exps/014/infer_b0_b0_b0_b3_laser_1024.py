@@ -18,9 +18,11 @@
 from pathlib import Path
 from typing import Dict, Any, Tuple
 
+import torch.nn as nn
 import pandas as pd
 import pytorch_lightning as pl
 import timm
+from shopee_product_matching.network import AffineHead
 from shopee_product_matching.tasks import test_tfidf, test_laser
 from shopee_product_matching.transform import read_resize_normalize, identity
 from shopee_product_matching.constants import TrainData
@@ -54,47 +56,51 @@ if is_kaggle():
 # %%
 def get_config_defaults() -> Dict[str, Any]:
     return {
-        "is_cv": True,
+        "is_cv": False,
         "test_batch_size": 16,
         "num_workers": 4,
-        "image_size": 128,
+        "image_size": 512,
         "model_params": [
             (
                 "efficientnet_b0",
-                "exp-005-effb0/exp-005-fold4-epoch7-val_loss0.00.ckpt",
+                "exp-014-effb0-1024/exp-014-fold0-epoch11-val_loss0.00.ckpt",
+                {"name": "affine", "dim": 1024},
                 {
                     "name": "arcface",
-                    "num_classes": TrainData.label_group_unique_unique_count,
+                    "num_classes": TrainData.label_group_unique_count_pdf_fold,
                 },
                 {"name": "cosine", "threshold": 0.45},
             ),
             (
                 "efficientnet_b0",
-                "exp-005-effb0/exp-005-fold3-epoch8-val_loss0.00.ckpt",
+                "exp-014-effb0-1024/exp-014-fold1-epoch9-val_loss0.00.ckpt",
+                {"name": "affine", "dim": 1024},
                 {
                     "name": "arcface",
-                    "num_classes": TrainData.label_group_unique_unique_count,
+                    "num_classes": TrainData.label_group_unique_count_pdf_fold,
                 },
                 {"name": "cosine", "threshold": 0.45},
             ),
-            #            (
-            #                "efficientnet_b0",
-            #                "exp-005-effb0/exp-005-fold2-epoch8-val_loss0.00.ckpt",
-            #                {
-            #                    "name": "arcface",
-            #                    "num_classes": TrainData.label_group_unique_unique_count,
-            #                },
-            #                {"name": "cosine", "threshold": 0.45},
-            #            ),
-            #            (
-            #                "efficientnet_b3",
-            #                "exp-005-effb3/exp-005-fold0-epoch7-val_loss0.00.ckpt",
-            #                {
-            #                    "name": "arcface",
-            #                    "num_classes": TrainData.label_group_unique_unique_count,
-            #                },
-            #                {"name": "cosine", "threshold": 0.45},
-            #            ),
+            (
+                "efficientnet_b0",
+                "exp-014-effb0-1024/exp-014-fold2-epoch10-val_loss0.00.ckpt",
+                {"name": "affine", "dim": 1024},
+                {
+                    "name": "arcface",
+                    "num_classes": TrainData.label_group_unique_count_pdf_fold,
+                },
+                {"name": "cosine", "threshold": 0.45},
+            ),
+            (
+                "efficientnet_b3",
+                "exp-014-effb3-1024/exp-014-fold3-epoch5-val_loss0.00.ckpt",
+                {"name": "affine", "dim": 1024},
+                {
+                    "name": "arcface",
+                    "num_classes": TrainData.label_group_unique_count_pdf_fold,
+                },
+                {"name": "cosine", "threshold": 0.45},
+            ),
         ],
     }
 
@@ -107,7 +113,6 @@ def create_datamodule(config: Any) -> ShopeeDataModule:
 
     def _escape(df: pd.DataFrame) -> pd.DataFrame:
         df["title"] = df["title"].apply(string_escape)
-        df = df.iloc[:1024]
         return df
 
     transforms = ShopeeDataModuleTransforms(test=_escape)
@@ -116,21 +121,41 @@ def create_datamodule(config: Any) -> ShopeeDataModule:
     dm.setup()
     return dm
 
+# %%
+from torch.nn.modules.batchnorm import _BatchNorm
 
+def adabn(net):
+    for m in net.modules():
+        if isinstance(m, _BatchNorm):
+            m.track_running_stats = False
+        
 # %%
 def create_system(
-    config: Any, model_param: Tuple[str, str, Dict[str, Any], Dict[str, Any]]
+    config: Any,
+    model_param: Tuple[str, str, Dict[str, Any], Dict[str, Any], Dict[str, Any]],
 ) -> pl.LightningModule:
-    backbone_name, checkpoint_filename, metric, match = model_param
+    backbone_name, checkpoint_filename, head_info, metric_info, match_info = model_param
     tag = Path(checkpoint_filename).stem
     backbone = timm.create_model(
         backbone_name, pretrained=True, num_classes=0, global_pool=""
     )
-    metric = create_metric(num_features=backbone.num_features, **metric)
-    match = create_match(**match)
+    if head_info["name"] == "affine":
+        head = AffineHead(in_dim=backbone.num_features, out_dim=head_info["dim"])
+        num_features = head_info["dim"]
+    else:
+        head = nn.Identity()
+        num_features = backbone.num_features
+    metric = create_metric(num_features=num_features, **metric_info)
+    match = create_match(**match_info)
+
+    backbone = adabn(backbone)
+    haed = adabn(head)
+    metric = adabn(metric)
+
     shopee_net = ImageMetricLearning.load_from_checkpoint(
         str(get_model_path(checkpoint_filename)),
         backbone=backbone,
+        head=head,
         metric=metric,
         match=match,
         submission_filename=f"submission_{tag}.csv",
@@ -143,8 +168,7 @@ def create_system(
 
 # %%
 def create_trainer(config: Any) -> ShopeeTrainer:
-    # trainer = ShopeeTrainer(config, monitor=None)
-    trainer = ShopeeTrainer(config, precision=32, monitor=None)
+    trainer = ShopeeTrainer(config, monitor=None)
     return trainer
 
 
@@ -161,10 +185,8 @@ def infer() -> None:
                 system = create_system(config, model_param)
                 trainer.test(system, datamodule=dm)
 
-            test_laser.main(
-                df, param={"threshold": 0.08}, save_confidence=True, weight=0.8
-            )
-            # test_tfidf.main(df, param={"max_features": 20000, "threshold": 0.20})
+            test_tfidf.main(df, param={"max_features": 20000, "threshold": 0.20})
+            test_laser.main(df, param={"threshold": 0.08})
 
 
 # %%

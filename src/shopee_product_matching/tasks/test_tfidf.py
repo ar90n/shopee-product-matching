@@ -54,6 +54,8 @@ def _main(
     tfidf_preds = find_matches( posting_ids=posting_ids, embeddings=tfidf_embeddings, matcher=tfidf_match)
     save_submission_csv(posting_ids, tfidf_preds, "submission_tfidf.csv")
 
+    
+
 if __name__ == "__main__":
     with open(sys.argv[1], "rb") as fp:
         obj = pickle.load(fp)
